@@ -3759,6 +3759,61 @@ useEffect(() => {
   return () => subscription.unsubscribe();
 }, []);
 
+  // Fetch products from Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setProductsLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_published', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching products:', error);
+        setProductsLoading(false);
+        return;
+      }
+
+      if (data) {
+        const mapped: Product[] = data.map((p: any) => ({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          shortDescription: p.short_description || '',
+          fullDescription: p.full_description || '',
+          price: Number(p.price) || 0,
+          currency: 'USD',
+          isFree: p.is_free,
+          thumbnail: p.thumbnail_url || '',
+          galleryImages: [],
+          figmaPreviewUrl: '',
+          categoryId: p.category_id || '',
+          subcategoryId: p.subcategory_id || '',
+          tags: p.tags || [],
+          fileSize: p.file_size || '',
+          formats: p.formats || ['Figma'],
+          screensCount: p.screens_count || 0,
+          componentsCount: p.components_count || 0,
+          version: p.version || '',
+          supportsVariables: p.supports_variables || false,
+          supportsAutoLayout: p.supports_auto_layout || false,
+          supportsLightDark: p.supports_light_dark || false,
+          licenseType: p.license_type || 'commercial',
+          downloadsCount: p.downloads_count || 0,
+          viewsCount: p.views_count || 0,
+          rating: Number(p.rating) || 0,
+          reviewsCount: p.reviews_count || 0,
+          downloadFileUrl: p.download_file_url || '',
+        }));
+        setProducts(mapped);
+      }
+      setProductsLoading(false);
+    };
+
+    fetchProducts();
+  }, []);
+
   const handleAuthSuccess = (user: AuthUser) => {
     setAuthUser(user);
     setAuthModal(null);
