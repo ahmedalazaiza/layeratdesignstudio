@@ -3763,74 +3763,63 @@ useEffect(() => {
   return () => subscription.unsubscribe();
 }, []);
 
-  // Fetch products from Supabase
-  // Fetch products from Supabase
+  // Fetch categories from Supabase
   useEffect(() => {
-    const fetchProducts = async () => {
-      setProductsLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          product_images (
-            image_url,
-            sort_order
-          )
-        `)
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
+    const fetchCategories = async () => {
+      setCategoriesLoading(true);
 
-      if (error) {
-        console.error('Error fetching products:', error);
-        setProductsLoading(false);
+      const { data: cats, error: catsError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (catsError) {
+        console.error('Error fetching categories:', catsError);
+        setCategoriesLoading(false);
         return;
       }
 
-      if (data) {
-        const mapped: Product[] = data.map((p: any) => {
-          // ترتيب الصور حسب sort_order
-          const images = (p.product_images || [])
-            .sort((a: any, b: any) => a.sort_order - b.sort_order)
-            .map((img: any) => img.image_url);
+      const { data: subs, error: subsError } = await supabase
+        .from('subcategories')
+        .select('*')
+        .order('sort_order', { ascending: true });
 
-          return {
-            id: p.id,
-            slug: p.slug,
-            title: p.title,
-            shortDescription: p.short_description || '',
-            fullDescription: p.full_description || '',
-            price: Number(p.price) || 0,
-            currency: 'USD',
-            isFree: p.is_free,
-            thumbnail: p.thumbnail_url || '',
-            galleryImages: images,
-            figmaPreviewUrl: '',
-            categoryId: p.category_id || '',
-            subcategoryId: p.subcategory_id || '',
-            tags: p.tags || [],
-            fileSize: p.file_size || '',
-            formats: p.formats || ['Figma'],
-            screensCount: p.screens_count || 0,
-            componentsCount: p.components_count || 0,
-            version: p.version || '',
-            supportsVariables: p.supports_variables || false,
-            supportsAutoLayout: p.supports_auto_layout || false,
-            supportsLightDark: p.supports_light_dark || false,
-            licenseType: p.license_type || 'commercial',
-            downloadsCount: p.downloads_count || 0,
-            viewsCount: p.views_count || 0,
-            rating: Number(p.rating) || 0,
-            reviewsCount: p.reviews_count || 0,
-            downloadFileUrl: p.download_file_url || '',
-          };
-        });
-        setProducts(mapped);
+      if (subsError) {
+        console.error('Error fetching subcategories:', subsError);
+        setCategoriesLoading(false);
+        return;
       }
-      setProductsLoading(false);
+
+      const iconMap: Record<string, React.ElementType> = {
+        Layers,
+        Layout,
+        FileText,
+        Package,
+        Smartphone,
+      };
+
+      const mapped: Category[] = (cats || []).map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        icon: iconMap[cat.icon] || Layers,
+        color: cat.color || '#aaff38',
+        subcategories: (subs || [])
+          .filter((s: any) => s.category_id === cat.id)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            slug: s.slug,
+          })),
+      }));
+
+      setCategories(mapped);
+      setCategoriesLoading(false);
     };
 
-    fetchProducts();
+    fetchCategories();
   }, []);
+  
   
   const handleAuthSuccess = (user: AuthUser) => {
     setAuthUser(user);
