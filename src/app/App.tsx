@@ -1,3 +1,4 @@
+import { supabase } from "../lib/supabase";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, useInView, AnimatePresence } from "motion/react";
 import {
@@ -583,60 +584,73 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus("loading");
-    setErrorMsg("");
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setStatus("loading");
+  setErrorMsg("");
 
-    if (mode === "register" && form.password !== form.confirmPassword) {
-      setErrorMsg("Passwords do not match.");
-      setStatus("error");
-      return;
-    }
+  if (mode === "register" && form.password !== form.confirmPassword) {
+    setErrorMsg("Passwords do not match.");
+    setStatus("error");
+    return;
+  }
 
-    try {
-      /*
-       * TODO: Replace simulation with real API call:
-       *
-       * const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
-       * const body = mode === "login"
-       *   ? { email: form.email, password: form.password }
-       *   : { name: form.name, email: form.email, password: form.password };
-       *
-       * const res = await fetch(`${API_BASE}${endpoint}`, {
-       *   method: "POST",
-       *   headers: { "Content-Type": "application/json" },
-       *   body: JSON.stringify(body),
-       * });
-       * if (!res.ok) throw new Error((await res.json()).message);
-       * const { user, token } = await res.json();
-       *
-       * localStorage.setItem("ld_token", token);
-       * localStorage.setItem("ld_user", JSON.stringify(user));
-       * onSuccess(user);
-       */
-      await new Promise(r => setTimeout(r, 1000)); // remove when API is wired
-
-      const mockUser: AuthUser = {
-        id: `u_${Date.now()}`,
-        name: mode === "register" ? form.name : "Demo Designer",
+  try {
+    if (mode === "register") {
+      // تسجيل حساب جديد
+      const { data, error } = await supabase.auth.signUp({
         email: form.email,
-        role: "user",
-        purchases: [],
-        wishlist: [],
-        createdAt: new Date().toISOString(),
-      };
+        password: form.password,
+        options: {
+          data: {
+            full_name: form.name,
+          },
+        },
+      });
 
-      // Store simulated session – swap with real JWT from backend
-      localStorage.setItem("ld_token", "simulated_token_replace_with_real_jwt");
-      localStorage.setItem("ld_user", JSON.stringify(mockUser));
-      onSuccess(mockUser);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Something went wrong. Please try again.");
-      setStatus("error");
+      if (error) throw error;
+
+      if (data.user) {
+        const newUser: AuthUser = {
+          id: data.user.id,
+          name: form.name || data.user.email?.split("@")[0] || "User",
+          email: data.user.email || form.email,
+          role: "user",
+          purchases: [],
+          wishlist: [],
+          createdAt: new Date().toISOString(),
+        };
+        onSuccess(newUser);
+      }
+    } else {
+      // تسجيل دخول
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        const loggedUser: AuthUser = {
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "User",
+          email: data.user.email || form.email,
+          role: "user",
+          purchases: [],
+          wishlist: [],
+          createdAt: data.user.created_at || new Date().toISOString(),
+        };
+        onSuccess(loggedUser);
+      }
     }
-  };
-
+  } catch (err: any) {
+    setErrorMsg(err.message || "Something went wrong. Please try again.");
+    setStatus("error");
+  } finally {
+    setStatus("idle");
+  }
+};
   const inputClass = "w-full px-5 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
 
   return (
@@ -3669,6 +3683,8 @@ export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [authModal, setAuthModal] = useState<"login" | "register" | null>(null);
   const [browseFilters, setBrowseFilters] = useState<Partial<BrowseFilters>>({});
   const [giftScrollReady, setGiftScrollReady] = useState(false);
@@ -3701,34 +3717,58 @@ export default function App() {
 
   // Restore auth session on app mount
   // TODO: Also validate token with GET ${API_BASE}/auth/me
-  useEffect(() => {
-    const storedUser = localStorage.getItem("ld_user");
-    const storedToken = localStorage.getItem("ld_token");
-    if (storedUser && storedToken) {
-      try {
-        setAuthUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("ld_user");
-        localStorage.removeItem("ld_token");
-      }
+// Restore auth session on app mount
+useEffect(() => {
+  const restoreSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (session?.user) {
+      const user = session.user;
+      setAuthUser({
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+        email: user.email || "",
+        role: "user",
+        purchases: [],
+        wishlist: [],
+        createdAt: user.created_at || new Date().toISOString(),
+      });
     }
-  }, []);
+  };
+
+  restoreSession();
+
+  // الاستماع لتغييرات الجلسة (تسجيل دخول / خروج)
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) {
+      const user = session.user;
+      setAuthUser({
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+        email: user.email || "",
+        role: "user",
+        purchases: [],
+        wishlist: [],
+        createdAt: user.created_at || new Date().toISOString(),
+      });
+    } else {
+      setAuthUser(null);
+    }
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
 
   const handleAuthSuccess = (user: AuthUser) => {
     setAuthUser(user);
     setAuthModal(null);
   };
 
-  const handleLogout = () => {
-    /*
-     * POST ${API_BASE}/auth/logout  (optional server-side session invalidation)
-     * Then clear local storage
-     */
-    localStorage.removeItem("ld_token");
-    localStorage.removeItem("ld_user");
-    setAuthUser(null);
-    setPage("home");
-  };
+const handleLogout = async () => {
+  await supabase.auth.signOut();
+  setAuthUser(null);
+  setPage("home");
+};
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
