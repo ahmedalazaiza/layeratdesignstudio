@@ -1017,10 +1017,10 @@ interface NavbarProps {
   onLogout: () => void;
   onSearch: (q: string) => void;
   wishlistCount: number;
+  categories: Category[];
 }
 
-function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLogout, onSearch, wishlistCount }: NavbarProps) {
-  const scrollY = useScrollY();
+function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLogout, onSearch, wishlistCount, categories }: NavbarProps) {  const scrollY = useScrollY();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1059,7 +1059,7 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
             Home
             <span className="absolute -bottom-0.5 left-3 right-3 h-px bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
           </button>
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button key={cat.id}
               onClick={() => { onNavigate("browse"); }}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group">
@@ -1211,7 +1211,7 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
               <Layout size={16} className="text-primary" />
               Home
             </button>
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <button key={cat.id}
                 onClick={() => { onNavigate("browse"); setMenuOpen(false); }}
                 className="flex items-center gap-3 w-full text-left py-3 text-base text-muted-foreground hover:text-foreground border-b border-border/30 last:border-0 transition-colors">
@@ -3886,16 +3886,17 @@ const handleLogout = async () => {
       <CustomCursor />
 
       <Navbar
-        isDark={isDark}
-        onToggle={() => setIsDark(d => !d)}
-        page={page}
-        onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-        authUser={authUser}
-        onAuthOpen={setAuthModal}
-        onLogout={handleLogout}
-        onSearch={handleSearch}
-        wishlistCount={authUser?.wishlist.length ?? 0}
-      />
+      isDark={isDark}
+      onToggle={() => setIsDark(d => !d)}
+      page={page}
+      onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+      authUser={authUser}
+      onAuthOpen={setAuthModal}
+      onLogout={handleLogout}
+      onSearch={handleSearch}
+      wishlistCount={authUser?.wishlist.length ?? 0}
+      categories={categories}
+    />
 
       {/* Gift popup — shown to guests after scrolling past section 2 */}
       <GiftPopup authUser={authUser} onSuccess={handleAuthSuccess} scrollReady={giftScrollReady} />
