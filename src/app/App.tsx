@@ -1765,7 +1765,9 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
 
 // ─── Featured Products ────────────────────────────────────────────────────────
 
-function FeaturedProducts({ onProductClick, onNavigate, authUser, onWishlistToggle, onAuthOpen }: {
+function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWishlistToggle, onAuthOpen }: {
+  products: Product[];
+  
   onProductClick: (p: Product) => void;
   onNavigate: (p: Page) => void;
   authUser: AuthUser | null;
@@ -1775,7 +1777,7 @@ function FeaturedProducts({ onProductClick, onNavigate, authUser, onWishlistTogg
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
   // TODO: Replace with GET ${API_BASE}/products/featured
-  const featured = PRODUCTS.slice(0, 6);
+  const featured = products.slice(0, 6);
 
   return (
     <section id="featured" ref={ref} className="py-24 lg:py-32">
@@ -3685,6 +3687,8 @@ export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [authModal, setAuthModal] = useState<"login" | "register" | null>(null);
   const [browseFilters, setBrowseFilters] = useState<Partial<BrowseFilters>>({});
   const [giftScrollReady, setGiftScrollReady] = useState(false);
@@ -3760,12 +3764,19 @@ useEffect(() => {
 }, []);
 
   // Fetch products from Supabase
+  // Fetch products from Supabase
   useEffect(() => {
     const fetchProducts = async () => {
       setProductsLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_images (
+            image_url,
+            sort_order
+          )
+        `)
         .eq('is_published', true)
         .order('created_at', { ascending: false });
 
@@ -3776,36 +3787,43 @@ useEffect(() => {
       }
 
       if (data) {
-        const mapped: Product[] = data.map((p: any) => ({
-          id: p.id,
-          slug: p.slug,
-          title: p.title,
-          shortDescription: p.short_description || '',
-          fullDescription: p.full_description || '',
-          price: Number(p.price) || 0,
-          currency: 'USD',
-          isFree: p.is_free,
-          thumbnail: p.thumbnail_url || '',
-          galleryImages: [],
-          figmaPreviewUrl: '',
-          categoryId: p.category_id || '',
-          subcategoryId: p.subcategory_id || '',
-          tags: p.tags || [],
-          fileSize: p.file_size || '',
-          formats: p.formats || ['Figma'],
-          screensCount: p.screens_count || 0,
-          componentsCount: p.components_count || 0,
-          version: p.version || '',
-          supportsVariables: p.supports_variables || false,
-          supportsAutoLayout: p.supports_auto_layout || false,
-          supportsLightDark: p.supports_light_dark || false,
-          licenseType: p.license_type || 'commercial',
-          downloadsCount: p.downloads_count || 0,
-          viewsCount: p.views_count || 0,
-          rating: Number(p.rating) || 0,
-          reviewsCount: p.reviews_count || 0,
-          downloadFileUrl: p.download_file_url || '',
-        }));
+        const mapped: Product[] = data.map((p: any) => {
+          // ترتيب الصور حسب sort_order
+          const images = (p.product_images || [])
+            .sort((a: any, b: any) => a.sort_order - b.sort_order)
+            .map((img: any) => img.image_url);
+
+          return {
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            shortDescription: p.short_description || '',
+            fullDescription: p.full_description || '',
+            price: Number(p.price) || 0,
+            currency: 'USD',
+            isFree: p.is_free,
+            thumbnail: p.thumbnail_url || '',
+            galleryImages: images,
+            figmaPreviewUrl: '',
+            categoryId: p.category_id || '',
+            subcategoryId: p.subcategory_id || '',
+            tags: p.tags || [],
+            fileSize: p.file_size || '',
+            formats: p.formats || ['Figma'],
+            screensCount: p.screens_count || 0,
+            componentsCount: p.components_count || 0,
+            version: p.version || '',
+            supportsVariables: p.supports_variables || false,
+            supportsAutoLayout: p.supports_auto_layout || false,
+            supportsLightDark: p.supports_light_dark || false,
+            licenseType: p.license_type || 'commercial',
+            downloadsCount: p.downloads_count || 0,
+            viewsCount: p.views_count || 0,
+            rating: Number(p.rating) || 0,
+            reviewsCount: p.reviews_count || 0,
+            downloadFileUrl: p.download_file_url || '',
+          };
+        });
         setProducts(mapped);
       }
       setProductsLoading(false);
@@ -3813,7 +3831,7 @@ useEffect(() => {
 
     fetchProducts();
   }, []);
-
+  
   const handleAuthSuccess = (user: AuthUser) => {
     setAuthUser(user);
     setAuthModal(null);
@@ -3913,13 +3931,14 @@ const handleLogout = async () => {
             <StatsSection />
             <CategoriesSection onCategoryClick={handleCategoryClick} />
             <FeaturedProducts
+              products={products}
               onProductClick={handleProductClick}
               onNavigate={setPage}
               authUser={authUser}
               onWishlistToggle={handleWishlistToggle}
               onAuthOpen={setAuthModal}
             />
-            <HowItWorks />
+        <HowItWorks />
             <Footer onNavigate={setPage} />
           </motion.main>
         )}
