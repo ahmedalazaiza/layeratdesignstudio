@@ -2,7 +2,7 @@ import { supabase } from "../lib/supabase";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, useInView, AnimatePresence } from "motion/react";
 import {
-  Sun, Moon, Menu, X, Search, ChevronLeft, ChevronDown, ChevronRight,
+  Sun, Moon, Menu, X, Search, EyeOff, ChevronLeft, ChevronDown, ChevronRight,
   Star, Download, Eye, Heart, ArrowUpRight, Check, User, Settings,
   LogOut, Package, Layers, Smartphone, FileText, Layout, Bell, Lock,
   Mail, CheckCircle, Filter, ExternalLink, Bookmark, Award, Clock,
@@ -569,97 +569,164 @@ function TiltCard({ children, className, onClick }: {
 // ─── Auth Modal ───────────────────────────────────────────────────────────────
 
 interface AuthModalProps {
-  mode: "login" | "register";
+  mode: "login" | "register" | "forgot_password";
   onClose: () => void;
   onSuccess: (user: AuthUser) => void;
-  onSwitchMode: (mode: "login" | "register") => void;
+  onSwitchMode: (mode: "login" | "register" | "forgot_password") => void;
 }
 
 function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
+const [status, setStatus] = useState<"idle" | "loading" | "error" | "check_email" | "reset_success">("idle");
+const [errorMsg, setErrorMsg] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const inputClass = "w-full px-5 py-3.5 pr-12 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setStatus("loading");
-  setErrorMsg("");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus("loading");
+    setErrorMsg("");
 
-  if (mode === "register" && form.password !== form.confirmPassword) {
-    setErrorMsg("Passwords do not match.");
-    setStatus("error");
+if (mode === "forgot_password") {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+      redirectTo: window.location.origin,
+    });
+
+    // حتى لو الإيميل مش موجود أو في rate limit، نعرض رسالة عامة
+    // ما نكشفش إذا الحساب موجود ولا لا
+    if (error && error.message.toLowerCase().includes("rate limit")) {
+      setErrorMsg("Too many requests. Please wait a bit and try again.");
+      setStatus("error");
+      return;
+    }
+
+    setStatus("reset_success");
+    return;
+  } catch (err: any) {
+    // في معظم الحالات نعرض نجاح عام
+    setStatus("reset_success");
     return;
   }
+}
+    if (mode === "register" && form.password !== form.confirmPassword) {
+      setErrorMsg("Passwords do not match.");
+      setStatus("error");
+      return;
+    }
 
-  try {
-    if (mode === "register") {
-      // تسجيل حساب جديد
-      const { data, error } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            full_name: form.name,
+    try {
+      if (mode === "register") {
+        const { data, error } = await supabase.auth.signUp({
+          email: form.email,
+          password: form.password,
+          options: {
+            data: {
+              full_name: form.name,
+            },
           },
-        },
-      });
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (data.user) {
-        const newUser: AuthUser = {
-          id: data.user.id,
-          name: form.name || data.user.email?.split("@")[0] || "User",
-          email: data.user.email || form.email,
-          role: "user",
-          purchases: [],
-          wishlist: [],
-          createdAt: new Date().toISOString(),
-        };
-        onSuccess(newUser);
+        if (data.user && !data.session) {
+          setStatus("check_email");
+          return;
+        }
+
+        if (data.user && data.session) {
+          const newUser: AuthUser = {
+            id: data.user.id,
+            name: form.name || data.user.email?.split("@")[0] || "User",
+            email: data.user.email || form.email,
+            role: "user",
+            purchases: [],
+            wishlist: [],
+            createdAt: data.user.created_at || new Date().toISOString(),
+          };
+          onSuccess(newUser);
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: form.email,
+          password: form.password,
+        });
+
+        if (error) throw error;
+
+        if (data.user) {
+          const loggedUser: AuthUser = {
+            id: data.user.id,
+            name: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "User",
+            email: data.user.email || form.email,
+            role: "user",
+            purchases: [],
+            wishlist: [],
+            createdAt: data.user.created_at || new Date().toISOString(),
+          };
+          onSuccess(loggedUser);
+        }
       }
-    } else {
-      // تسجيل دخول
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        const loggedUser: AuthUser = {
-          id: data.user.id,
-          name: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "User",
-          email: data.user.email || form.email,
-          role: "user",
-          purchases: [],
-          wishlist: [],
-          createdAt: data.user.created_at || new Date().toISOString(),
-        };
-        onSuccess(loggedUser);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Something went wrong. Please try again.");
+      setStatus("error");
+    } finally {
+      if (status !== "check_email" && status !== "reset_success") {
+        setStatus("idle");
       }
     }
-  } catch (err: any) {
-    setErrorMsg(err.message || "Something went wrong. Please try again.");
-    setStatus("error");
-  } finally {
-    setStatus("idle");
-  }
-};
-  const inputClass = "w-full px-5 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+  };
+
+  const renderPasswordField = (
+    name: "password" | "confirmPassword",
+    value: string,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+    placeholder: string,
+    label: string,
+    show: boolean,
+    setShow: (value: boolean) => void,
+    required: boolean = true,
+    minLength?: number
+  ) => (
+    <div className="relative">
+      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">{label}</label>
+      <input
+        name={name}
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        required={required}
+        placeholder={placeholder}
+        minLength={minLength}
+        className={inputClass}
+      />
+      <button
+        type="button"
+        aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+        onClick={() => setShow(!show)}
+        className="absolute right-3 top-[42px] flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  );
+
+  const isResetSuccess = status === "reset_success";
+  const isCheckEmail = status === "check_email";
 
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-        {/* Backdrop */}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
         <motion.div
@@ -667,79 +734,182 @@ const handleSubmit = async (e: React.FormEvent) => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.97 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl">
-
-          <button onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 transition-all duration-200">
+          className="relative w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl"
+        >
+          <button onClick={onClose} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 transition-all duration-200">
             <X size={15} />
           </button>
 
-          {/* Logo */}
           <div className="text-3xl text-foreground leading-none mb-2" style={{ fontFamily: "'Cookie', cursive" }}>
             Layerat<span style={{ color: "#aaff38" }}>.</span>
           </div>
           <p className="text-xs text-muted-foreground mb-8 font-mono">Design Studio Marketplace</p>
 
-          <h2 className="text-xl font-display font-bold text-foreground mb-6">
-            {mode === "login" ? "Welcome back" : "Create your account"}
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "register" && (
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Full Name</label>
-                <input name="name" value={form.name} onChange={handleChange} required
-                  placeholder="Your name" className={inputClass} />
+          {isCheckEmail ? (
+            <>
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <CheckCircle size={28} />
               </div>
-            )}
-
-            <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email</label>
-              <input name="email" type="email" value={form.email} onChange={handleChange} required
-                placeholder="you@example.com" className={inputClass} />
-            </div>
-
-            <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Password</label>
-              <input name="password" type="password" value={form.password} onChange={handleChange} required
-                placeholder="••••••••" minLength={6} className={inputClass} />
-            </div>
-
-            {mode === "register" && (
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Confirm Password</label>
-                <input name="confirmPassword" type="password" value={form.confirmPassword} onChange={handleChange} required
-                  placeholder="••••••••" className={inputClass} />
+              <h2 className="text-xl font-display font-bold text-foreground mb-3">Check your email</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                We sent a confirmation link to <span className="font-semibold text-foreground">{form.email}</span>.
+                Click it to verify your account, then sign in to continue.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(f => ({ ...f, password: "", confirmPassword: "" }));
+                  onSwitchMode("login");
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] transition-all duration-300"
+              >
+                Back to sign in
+              </button>
+            </>
+          ) : isResetSuccess ? (
+            <>
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Mail size={28} />
               </div>
-            )}
+              <h2 className="text-xl font-display font-bold text-foreground mb-3">Check your email</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                We sent a password reset link to <span className="font-semibold text-foreground">{form.email}</span>.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(f => ({ ...f, email: "", password: "", confirmPassword: "" }));
+                  setStatus("idle");
+                  onSwitchMode("login");
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] transition-all duration-300"
+              >
+                Continue to sign in
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-display font-bold text-foreground mb-6">
+                {mode === "login" ? "Welcome back" : mode === "forgot_password" ? "Reset password" : "Create your account"}
+              </h2>
 
-            {status === "error" && errorMsg && (
-              <div className="flex items-center gap-2 text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3">
-                <AlertCircle size={14} />
-                {errorMsg}
-              </div>
-            )}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {mode === "register" && (
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Full Name</label>
+                    <input name="name" value={form.name} onChange={handleChange} required placeholder="Your name" className={inputClass} />
+                  </div>
+                )}
 
-            <button type="submit" disabled={status === "loading"}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2">
-              {status === "loading" ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  {mode === "login" ? "Signing in..." : "Creating account..."}
-                </span>
-              ) : (
-                mode === "login" ? "Sign In" : "Create Account"
-              )}
-            </button>
-          </form>
+                {mode !== "forgot_password" && (
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email</label>
+                    <input name="email" type="email" value={form.email} onChange={handleChange} required placeholder="you@example.com" className={inputClass} />
+                  </div>
+                )}
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            {mode === "login" ? "New to Layerat?" : "Already have an account?"}{" "}
-            <button onClick={() => onSwitchMode(mode === "login" ? "register" : "login")}
-              className="text-primary font-semibold hover:underline">
-              {mode === "login" ? "Create account" : "Sign in"}
-            </button>
-          </p>
+                {mode === "forgot_password" ? (
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email</label>
+                    <input name="email" type="email" value={form.email} onChange={handleChange} required placeholder="you@example.com" className={inputClass} />
+                  </div>
+                ) : (
+                  <>
+                    {renderPasswordField(
+                      "password",
+                      form.password,
+                      handleChange,
+                      "••••••••",
+                      "Password",
+                      showPassword,
+                      setShowPassword,
+                      true,
+                      6
+                    )}
+
+                    {mode === "register" && renderPasswordField(
+                      "confirmPassword",
+                      form.confirmPassword,
+                      handleChange,
+                      "••••••••",
+                      "Confirm Password",
+                      showConfirmPassword,
+                      setShowConfirmPassword,
+                      true
+                    )}
+                  </>
+                )}
+
+                {mode === "login" && (
+                  <div className="flex justify-end -mt-1">
+                    <button
+                      type="button"
+                      onClick={() => onSwitchMode("forgot_password")}
+                      className="text-xs text-primary hover:underline font-medium"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
+
+                {status === "error" && errorMsg && (
+                  <div className="flex items-center gap-2 text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3">
+                    <AlertCircle size={14} />
+                    {errorMsg}
+                  </div>
+                )}
+
+                {mode === "register" && (
+                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed text-center">
+                    By creating an account, you agree to our{" "}
+                    <button type="button" onClick={() => {}} className="text-primary hover:underline font-medium">Terms of Use</button>
+                    {" "}and{" "}
+                    <button type="button" onClick={() => {}} className="text-primary hover:underline font-medium">Privacy Policy</button>.
+                  </p>
+                )}
+                {(status as string) === "reset_success" && mode === "forgot_password" && (
+                  <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                    If an account exists with this email, you will receive a password reset link shortly.
+                  </p>
+                )}
+                
+                {mode === "forgot_password" ? (
+                  <button type="submit" disabled={status === "loading"} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2">
+                    {status === "loading" ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                        Sending link...
+                      </span>
+                    ) : (
+                      "Send reset link"
+                    )}
+                  </button>
+                ) : (
+                  
+                  <button type="submit" disabled={status === "loading"} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2">
+                    {status === "loading" ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                        {mode === "login" ? "Signing in..." : "Creating account..."}
+                      </span>
+                    ) : (
+                      mode === "login" ? "Sign In" : "Create Account"
+                    )}
+                  </button>
+                )}
+              </form>
+
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                {mode === "login" ? "New to Layerat?" : mode === "register" ? "Already have an account?" : "Remembered your password?"}{" "}
+                <button
+                  onClick={() => onSwitchMode(mode === "login" ? "register" : mode === "register" ? "login" : "login")}
+                  className="text-primary font-semibold hover:underline"
+                >
+                  {mode === "login" ? "Create account" : mode === "register" ? "Sign in" : "Back to sign in"}
+                </button>
+              </p>
+            </>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -1013,7 +1183,7 @@ interface NavbarProps {
   page: Page;
   onNavigate: (p: Page) => void;
   authUser: AuthUser | null;
-  onAuthOpen: (mode: "login" | "register") => void;
+  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   onLogout: () => void;
   onSearch: (q: string) => void;
   wishlistCount: number;
@@ -1063,7 +1233,7 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
             <button key={cat.id}
               onClick={() => { onNavigate("browse"); }}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group">
-              {cat.name.split(" ")[0]}
+              {cat.name}
               <span className="absolute -bottom-0.5 left-3 right-3 h-px bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
             </button>
           ))}
@@ -1262,7 +1432,7 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
 function Hero({ onSearch, onNavigate, onAuthOpen }: {
   onSearch: (q: string) => void;
   onNavigate: (p: Page) => void;
-  onAuthOpen: (mode: "login" | "register") => void;
+  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -1652,7 +1822,7 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
   onProductClick: (p: Product) => void;
   authUser: AuthUser | null;
   onWishlistToggle: (productId: string) => void;
-  onAuthOpen: (mode: "login" | "register") => void;
+  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   categories: Category[];
 }) {
   const [hovered, setHovered] = useState(false);
@@ -1773,7 +1943,7 @@ function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWi
   onNavigate: (p: Page) => void;
   authUser: AuthUser | null;
   onWishlistToggle: (id: string) => void;
-  onAuthOpen: (mode: "login" | "register") => void;
+  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   categories: Category[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -1880,7 +2050,7 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
   product: Product;
   onBack: () => void;
   authUser: AuthUser | null;
-  onAuthOpen: (mode: "login" | "register") => void;
+  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   onWishlistToggle: (id: string) => void;
   categories: Category[];
 }) {
@@ -2306,7 +2476,7 @@ function BrowsePage({
   onProductClick: (p: Product) => void;
   authUser: AuthUser | null;
   onWishlistToggle: (id: string) => void;
-  onAuthOpen: (mode: "login" | "register") => void;
+  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   categories: Category[];
   products: Product[];
 }) {
@@ -2942,7 +3112,7 @@ function PublisherPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
     name: "", email: "", portfolio: "", social: "",
     experience: "", categories: [] as string[], message: "",
   });
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | "check_email" | "reset_success">("idle");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -3878,6 +4048,110 @@ function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate 
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
+function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters.");
+      setStatus("error");
+      return;
+    }
+    if (password !== confirm) {
+      setErrorMsg("Passwords do not match.");
+      setStatus("error");
+      return;
+    }
+
+    setStatus("loading");
+    setErrorMsg("");
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      setErrorMsg(error.message);
+      setStatus("error");
+      return;
+    }
+
+    setStatus("success");
+    setTimeout(() => onClose(), 1500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-xl">
+        <h2 className="text-xl font-display font-bold text-foreground mb-1">Set new password</h2>
+        <p className="text-sm text-muted-foreground mb-6">Enter a strong new password for your account.</p>
+
+        {status === "success" ? (
+          <div className="text-center py-6">
+            <p className="text-sm font-semibold text-foreground">Password updated successfully!</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">New Password</label>
+              <div className="relative">
+                <input
+                  type={showPass ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 pr-11"
+                  placeholder="••••••••"
+                />
+                <button type="button" onClick={() => setShowPass(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 pr-11"
+                  placeholder="••••••••"
+                />
+                <button type="button" onClick={() => setShowConfirm(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {status === "error" && errorMsg && (
+              <div className="flex items-center gap-2 text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3">
+                <AlertCircle size={14} />
+                {errorMsg}
+              </div>
+            )}
+
+            <button type="submit" disabled={status === "loading"}
+              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all">
+              {status === "loading" ? "Updating..." : "Update Password"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [page, setPage] = useState<Page>("home");
@@ -3887,9 +4161,11 @@ export default function App() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [authModal, setAuthModal] = useState<"login" | "register" | null>(null);
+  const [authModal, setAuthModal] = useState<"login" | "register" | "forgot_password" | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [browseFilters, setBrowseFilters] = useState<Partial<BrowseFilters>>({});
   const [giftScrollReady, setGiftScrollReady] = useState(false);
+  const [forceShowContent, setForceShowContent] = useState(false);
 
   // Restore theme preference from localStorage; default is light
   useEffect(() => {
@@ -3955,11 +4231,16 @@ useEffect(() => {
   restoreSession();
 
   // الاستماع لتغييرات الجلسة (تسجيل دخول / خروج)
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Password recovery link clicked
+    if (event === "PASSWORD_RECOVERY") {
+      setPasswordRecovery(true);
+      return;
+    }
+
     if (session?.user) {
       const user = session.user;
-      
-      // Fetch user's wishlist from Supabase
+
       const { data: wishlistData, error: wishlistError } = await supabase
         .from('wishlist')
         .select('product_id')
@@ -4241,148 +4522,195 @@ const handleLogout = async () => {
     });
   };
 
+  useEffect(() => {
+    if (!productsLoading && !categoriesLoading) return;
+
+    const timeout = window.setTimeout(() => {
+      setForceShowContent(true);
+    }, 6000);
+
+    return () => window.clearTimeout(timeout);
+  }, [productsLoading, categoriesLoading]);
+
+  const showGlobalLoader = (productsLoading || categoriesLoading) && !forceShowContent;
+
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <CustomCursor />
-
-      <Navbar
-      isDark={isDark}
-      onToggle={() => setIsDark(d => !d)}
-      page={page}
-      onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-      authUser={authUser}
-      onAuthOpen={setAuthModal}
-      onLogout={handleLogout}
-      onSearch={handleSearch}
-      wishlistCount={authUser?.wishlist.length ?? 0}
-      categories={categories}
-    />
-
-      {/* Gift popup — shown to guests after scrolling past section 2 */}
-      <GiftPopup authUser={authUser} onSuccess={handleAuthSuccess} scrollReady={giftScrollReady} />
-
-      {/* Auth modal */}
-      <AnimatePresence>
-        {authModal && (
-          <AuthModal
-            mode={authModal}
-            onClose={() => setAuthModal(null)}
-            onSuccess={handleAuthSuccess}
-            onSwitchMode={setAuthModal}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Page routing */}
-      <AnimatePresence mode="wait">
-        {page === "home" && (
-          <motion.main key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <Hero onSearch={handleSearch} onNavigate={setPage} onAuthOpen={setAuthModal} />
-            <StatsSection />
-            <CategoriesSection onCategoryClick={handleCategoryClick} categories={categories} />
-            <FeaturedProducts
-              products={products}
-              onProductClick={handleProductClick}
-              onNavigate={setPage}
-              authUser={authUser}
-              onWishlistToggle={handleWishlistToggle}
-              onAuthOpen={setAuthModal}
-              categories={categories}
-            />
-        <HowItWorks />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "browse" && (
-          <motion.main key="browse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <BrowsePage
-              initialFilters={browseFilters}
-              onProductClick={handleProductClick}
-              authUser={authUser}
-              onWishlistToggle={handleWishlistToggle}
-              onAuthOpen={setAuthModal}
-              categories={categories}
-              products={products}
-            />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "product" && selectedProduct && (
-          <motion.main key="product" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <ProductDetail
-              product={selectedProduct}
-              onBack={handleBack}
-              authUser={authUser}
-              onAuthOpen={setAuthModal}
-              onWishlistToggle={handleWishlistToggle}
-              categories={categories}
-            />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "profile" && authUser && (
-          <motion.main key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <ProfilePage
-              authUser={authUser}
-              onUpdate={handleProfileUpdate}
-              onLogout={handleLogout}
-              onProductClick={handleProductClick}
-            />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "publisher" && (
-          <motion.main key="publisher" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <PublisherPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "team" && (
-          <motion.main key="team" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <TeamPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "about" && (
-          <motion.main key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <AboutPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {page === "favorites" && (
-          <motion.main key="favorites" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            <FavoritesPage
-              authUser={authUser}
-              onProductClick={handleProductClick}
-              onWishlistToggle={handleWishlistToggle}
-              onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-            />
-            <Footer onNavigate={setPage} categories={categories} />
-          </motion.main>
-        )}
-
-        {/* Redirect unauthenticated profile access */}
-        {page === "profile" && !authUser && (
-          <motion.main key="profile-redirect" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
-            className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-display font-bold text-foreground mb-3">Sign in to view your profile</h2>
-              <p className="text-muted-foreground mb-6">Create a free account to save your resources.</p>
-              <button onClick={() => setAuthModal("login")}
-                className="px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity">
-                Sign In
-              </button>
+    <AnimatePresence mode="wait">
+      {showGlobalLoader ? (
+        <motion.div
+          key="global-loader"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: "easeInOut" }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+        >
+          <div className="flex flex-col items-center gap-5 text-center">
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/5">
+              <div className="h-10 w-10 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin" />
+              <div className="absolute inset-0 rounded-full border border-primary/20" />
             </div>
-          </motion.main>
-        )}
-      </AnimatePresence>
-    </div>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-[0.34em] text-muted-foreground">Layerat</p>
+              <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Loading your library</h1>
+            </div>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="app-shell"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35, ease: "easeInOut" }}
+          className="min-h-screen bg-background text-foreground overflow-x-hidden"
+        >
+          {/* <CustomCursor /> */}
+
+          <Navbar
+            isDark={isDark}
+            onToggle={() => setIsDark(d => !d)}
+            page={page}
+            onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            authUser={authUser}
+            onAuthOpen={setAuthModal}
+            onLogout={handleLogout}
+            onSearch={handleSearch}
+            wishlistCount={authUser?.wishlist.length ?? 0}
+            categories={categories}
+          />
+
+          {passwordRecovery && (
+          <SetNewPasswordModal onClose={() => setPasswordRecovery(false)} />
+          )}
+
+          {/* Gift popup — shown to guests after scrolling past section 2 */}
+          <GiftPopup authUser={authUser} onSuccess={handleAuthSuccess} scrollReady={giftScrollReady} />
+
+          {/* Auth modal */}
+          <AnimatePresence>
+            {authModal && (
+              <AuthModal
+                mode={authModal}
+                onClose={() => setAuthModal(null)}
+                onSuccess={handleAuthSuccess}
+                onSwitchMode={setAuthModal}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Page routing */}
+          <AnimatePresence mode="wait">
+            {page === "home" && (
+              <motion.main key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <Hero onSearch={handleSearch} onNavigate={setPage} onAuthOpen={setAuthModal} />
+                <StatsSection />
+                <CategoriesSection onCategoryClick={handleCategoryClick} categories={categories} />
+                <FeaturedProducts
+                  products={products}
+                  onProductClick={handleProductClick}
+                  onNavigate={setPage}
+                  authUser={authUser}
+                  onWishlistToggle={handleWishlistToggle}
+                  onAuthOpen={setAuthModal}
+                  categories={categories}
+                />
+                <HowItWorks />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "browse" && (
+              <motion.main key="browse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <BrowsePage
+                  initialFilters={browseFilters}
+                  onProductClick={handleProductClick}
+                  authUser={authUser}
+                  onWishlistToggle={handleWishlistToggle}
+                  onAuthOpen={setAuthModal}
+                  categories={categories}
+                  products={products}
+                />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "product" && selectedProduct && (
+              <motion.main key="product" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <ProductDetail
+                  product={selectedProduct}
+                  onBack={handleBack}
+                  authUser={authUser}
+                  onAuthOpen={setAuthModal}
+                  onWishlistToggle={handleWishlistToggle}
+                  categories={categories}
+                />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "profile" && authUser && (
+              <motion.main key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <ProfilePage
+                  authUser={authUser}
+                  onUpdate={handleProfileUpdate}
+                  onLogout={handleLogout}
+                  onProductClick={handleProductClick}
+                />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "publisher" && (
+              <motion.main key="publisher" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <PublisherPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "team" && (
+              <motion.main key="team" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <TeamPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "about" && (
+              <motion.main key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <AboutPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "favorites" && (
+              <motion.main key="favorites" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <FavoritesPage
+                  authUser={authUser}
+                  onProductClick={handleProductClick}
+                  onWishlistToggle={handleWishlistToggle}
+                  onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                />
+                <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {/* Redirect unauthenticated profile access */}
+            {page === "profile" && !authUser && (
+              <motion.main key="profile-redirect" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
+                className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                  <h2 className="text-2xl font-display font-bold text-foreground mb-3">Sign in to view your profile</h2>
+                  <p className="text-muted-foreground mb-6">Create a free account to save your resources.</p>
+                  <button onClick={() => setAuthModal("login")}
+                    className="px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity">
+                    Sign In
+                  </button>
+                </div>
+              </motion.main>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
+
