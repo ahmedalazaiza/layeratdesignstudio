@@ -90,7 +90,7 @@ export const API_BASE: string =
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Page = "home" | "browse" | "product" | "profile" | "publisher" | "team" | "about" | "favorites";
+type Page = "home" | "browse" | "product" | "profile" | "publisher" | "team" | "about" | "favorites" | "admin";
 
 interface Subcategory {
   id: string;
@@ -661,17 +661,23 @@ if (mode === "forgot_password") {
         if (error) throw error;
 
         if (data.user) {
-          const loggedUser: AuthUser = {
-            id: data.user.id,
-            name: data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "User",
-            email: data.user.email || form.email,
-            role: "user",
-            purchases: [],
-            wishlist: [],
-            createdAt: data.user.created_at || new Date().toISOString(),
-          };
-          onSuccess(loggedUser);
-        }
+          const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        
+        const loggedUser: AuthUser = {
+          id: data.user.id,
+          name: profile?.full_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "User",
+          email: data.user.email || form.email,
+          role: (profile?.role as "user" | "admin") || "user",
+          purchases: [],
+          wishlist: [],
+          createdAt: data.user.created_at || new Date().toISOString(),
+        };
+        onSuccess(loggedUser);
+      }
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Something went wrong. Please try again.");
@@ -1188,9 +1194,12 @@ interface NavbarProps {
   onSearch: (q: string) => void;
   wishlistCount: number;
   categories: Category[];
+  onCategoryClick: (categoryId: string) => void;
+  activeCategoryId: string | null;
 }
 
-function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLogout, onSearch, wishlistCount, categories }: NavbarProps) {  const scrollY = useScrollY();
+function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLogout, onSearch, wishlistCount, categories, onCategoryClick, activeCategoryId }: NavbarProps) {
+  const scrollY = useScrollY();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1223,24 +1232,31 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
         </button>
 
         {/* Desktop center nav */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-2 ml-8">
           <button onClick={() => onNavigate("home")}
             className={`text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group ${page === "home" ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}>
             Home
             <span className="absolute -bottom-0.5 left-3 right-3 h-px bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
           </button>
-          {categories.map(cat => (
-            <button key={cat.id}
-              onClick={() => { onNavigate("browse"); }}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group">
-              {cat.name}
-              <span className="absolute -bottom-0.5 left-3 right-3 h-px bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-            </button>
-          ))}
-          <button onClick={() => onNavigate("browse")}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5">
-            Browse All
-          </button>
+
+          {categories.map(cat => {
+  const isActive = activeCategoryId === cat.id;
+  return (
+    <button
+      key={cat.id}
+      onClick={() => onCategoryClick(cat.id)}
+      className={`text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group ${
+        isActive ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {cat.name}
+      <span className={`absolute -bottom-0.5 left-3 right-3 h-px bg-primary transition-transform duration-300 ${
+        isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+      }`} />
+    </button>
+  );
+})}
+
         </div>
 
         {/* Right actions */}
@@ -1407,6 +1423,15 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
                   className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Sign Out
                 </button>
+                {authUser?.role === "admin" && (
+  <button
+    onClick={() => { onNavigate("admin"); setProfileOpen(false); }}
+    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 rounded-xl"
+  >
+    <Settings size={15} />
+    Admin Dashboard
+  </button>
+)}
               </div>
             ) : (
               <div className="mt-4 space-y-2">
@@ -2054,6 +2079,61 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
   onWishlistToggle: (id: string) => void;
   categories: Category[];
 }) {
+
+  useEffect(() => {
+    const loadStatsAndRecordView = async () => {
+      // 1) سجل مشاهدة
+      const viewerKey = authUser?.id || localStorage.getItem("ld_viewer_key") || crypto.randomUUID();
+      if (!localStorage.getItem("ld_viewer_key") && !authUser) {
+        localStorage.setItem("ld_viewer_key", viewerKey);
+      }
+
+      await supabase.from("product_views").insert({
+        product_id: product.id,
+        viewer_key: viewerKey,
+      });
+
+      // 2) عدّ المشاهدات
+      const { count: viewsCount } = await supabase
+        .from("product_views")
+        .select("*", { count: "exact", head: true })
+        .eq("product_id", product.id);
+
+      // 3) عدّ التحميلات
+      const { count: downloadsCount } = await supabase
+        .from("downloads")
+        .select("*", { count: "exact", head: true })
+        .eq("product_id", product.id);
+
+      // 4) التقييمات
+      const { data: reviews } = await supabase
+        .from("reviews")
+        .select("rating")
+        .eq("product_id", product.id);
+
+      const reviewsCount = reviews?.length || 0;
+      const rating =
+        reviewsCount > 0
+          ? reviews!.reduce((sum, r) => sum + (r.rating || 0), 0) / reviewsCount
+          : 0;
+
+      setStats({
+        downloadsCount: downloadsCount || 0,
+        viewsCount: viewsCount || 0,
+        rating: Math.round(rating * 10) / 10,
+        reviewsCount,
+      });
+    };
+
+    loadStatsAndRecordView();
+  }, [product.id, authUser?.id]);
+
+  const [stats, setStats] = useState({
+    downloadsCount: product.downloadsCount || 0,
+    viewsCount: product.viewsCount || 0,
+    rating: product.rating || 0,
+    reviewsCount: product.reviewsCount || 0,
+  });
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading" | "success">("idle");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [alreadyDownloadedModal, setAlreadyDownloadedModal] = useState(false);
@@ -2201,16 +2281,16 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
               <div className="flex flex-wrap gap-5 text-sm text-muted-foreground mb-6">
                 <div className="flex items-center gap-1.5">
                   <Star size={13} className="text-primary fill-primary" />
-                  <span className="font-mono font-bold text-foreground">{product.rating.toFixed(1)}</span>
-                  <span>({product.reviewsCount} reviews)</span>
+                  <span className="font-mono font-bold text-foreground">{stats.rating.toFixed(1)}</span>
+                  <span>({stats.reviewsCount} reviews)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Download size={13} />
-                  <span className="font-mono font-bold text-foreground">{product.downloadsCount.toLocaleString()}</span> downloads
+                  <span className="font-mono font-bold text-foreground">{stats.downloadsCount.toLocaleString()}</span> downloads
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Eye size={13} />
-                  <span className="font-mono font-bold text-foreground">{product.viewsCount.toLocaleString()}</span> views
+                  <span className="font-mono font-bold text-foreground">{stats.viewsCount.toLocaleString()}</span> views
                 </div>
               </div>
 
@@ -3113,7 +3193,7 @@ function PublisherPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
     experience: "", categories: [] as string[], message: "",
   });
 const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | "check_email" | "reset_success">("idle");
-
+  const [errorMsg, setErrorMsg] = useState("");
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
   };
@@ -3130,16 +3210,32 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("loading");
+    setErrorMsg("");
     try {
-      /*
-       * TODO: POST ${API_BASE}/publisher-applications
-       * body: { name, email, portfolio, social, experience, categories, message }
-       * resp: { applicationId, status: "pending" }
-       * Send confirmation email via backend on success
-       */
-      await new Promise(r => setTimeout(r, 1400));
+      const { error } = await supabase.from("publisher_applications").insert({
+        name: form.name,
+        email: form.email,
+        portfolio: form.portfolio || null,
+        social: form.social || null,
+        experience: form.experience || null,
+        categories: form.categories,
+        message: form.message || null,
+        status: "pending",
+      });
+  
+      if (error) {
+        if (error.code === "23505") {
+          setStatus("error");
+          // رسالة أوضح للمستخدم
+          setErrorMsg("You already submitted an application with this email.");
+          return;
+        }
+        throw error;
+      }
+  
       setStatus("success");
-    } catch {
+    } catch (err: any) {
+      console.error("Publisher application error:", err);
       setStatus("error");
     }
   };
@@ -3388,13 +3484,13 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
 
               <div>
                 <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Portfolio / Figma Community URL *</label>
-                <input name="portfolio" value={form.portfolio} onChange={handleChange} required type="url"
+                <input name="portfolio" value={form.portfolio} onChange={handleChange} required type="text"
                   placeholder="https://www.figma.com/@yourprofile" className={inputClass} />
               </div>
 
               <div>
                 <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Dribbble / Behance / Personal Site</label>
-                <input name="social" value={form.social} onChange={handleChange} type="url"
+                <input name="social" value={form.social} onChange={handleChange} type="text"
                   placeholder="https://dribbble.com/yourprofile" className={inputClass} />
               </div>
 
@@ -3430,8 +3526,9 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
               </div>
 
               {status === "error" && (
-                <div className="flex items-center gap-2 text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3">
-                  <AlertCircle size={14} /> Something went wrong. Please try again.
+                <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-destructive/20 border border-red-200 dark:border-destructive/30 rounded-xl px-4 py-3">
+                  <AlertCircle size={14} />
+                  {errorMsg || "Something went wrong. Please try again."}
                 </div>
               )}
 
@@ -3951,13 +4048,14 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
 
 // ─── Favorites Page ───────────────────────────────────────────────────────────
 
-function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate }: {
+function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate, products }: {
   authUser: AuthUser | null;
   onProductClick: (p: Product) => void;
   onWishlistToggle: (id: string) => void;
   onNavigate: (p: Page) => void;
+  products: Product[];
 }) {
-  const favoriteProducts = PRODUCTS.filter(p => authUser?.wishlist.includes(p.id));
+  const favoriteProducts = products.filter(p => authUser?.wishlist.includes(p.id));
 
   return (
     <main className="min-h-screen pt-24 pb-20">
@@ -4152,6 +4250,376 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function PublisherApplicationsPanel() {
+  const [apps, setApps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("publisher_applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error loading publisher applications:", error);
+      }
+      setApps(data || []);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-8 text-center text-muted-foreground">
+        Loading applications...
+      </div>
+    );
+  }
+
+  if (apps.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-8 text-center text-muted-foreground">
+        No publisher applications yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/30 text-left">
+              <th className="px-4 py-3 font-medium text-muted-foreground">Name</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">Email</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">Portfolio</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {apps.map((app) => (
+              <tr key={app.id} className="border-b border-border/60 hover:bg-muted/20">
+                <td className="px-4 py-3 text-foreground font-medium">{app.name}</td>
+                <td className="px-4 py-3 text-muted-foreground">{app.email}</td>
+                <td className="px-4 py-3">
+                  {app.portfolio ? (
+                    <a href={app.portfolio.startsWith("http") ? app.portfolio : `https://${app.portfolio}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      Open
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                    {app.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {app.created_at ? new Date(app.created_at).toLocaleDateString() : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+function CategoriesAdminPanel() {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const emptyForm = {
+    name: "",
+    slug: "",
+    icon: "Layers",
+    color: "#aaff38",
+    sort_order: 0,
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const iconOptions = ["Layers", "Layout", "FileText", "Package", "Smartphone", "Globe", "Code", "Zap"];
+
+  const loadCategories = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    if (error) console.error(error);
+    setCategories(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const generateSlug = (name: string) =>
+    name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
+
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setError("");
+    setSuccess("");
+  };
+
+  const startEdit = (cat: any) => {
+    setEditingId(cat.id);
+    setForm({
+      name: cat.name || "",
+      slug: cat.slug || "",
+      icon: cat.icon || "Layers",
+      color: cat.color || "#aaff38",
+      sort_order: cat.sort_order || 0,
+    });
+    setError("");
+    setSuccess("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!form.name.trim() || !form.slug.trim()) {
+      setError("Name and slug are required.");
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      name: form.name.trim(),
+      slug: form.slug.trim(),
+      icon: form.icon,
+      color: form.color,
+      sort_order: Number(form.sort_order) || 0,
+    };
+
+    const result = editingId
+      ? await supabase.from("categories").update(payload).eq("id", editingId)
+      : await supabase.from("categories").insert(payload);
+
+    setSaving(false);
+
+    if (result.error) {
+      if (result.error.code === "23505") {
+        setError("This slug already exists.");
+      } else {
+        setError(result.error.message || "Something went wrong.");
+      }
+      return;
+    }
+
+    setSuccess(editingId ? "Category updated." : "Category created.");
+    resetForm();
+    loadCategories();
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* LEFT: Form */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-start justify-between gap-3 mb-6">
+          <div>
+            <h2 className="text-lg font-display font-bold text-foreground">
+              {editingId ? "Edit Category" : "Add Category"}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              {editingId ? "Update category details then save." : "Create a category for navbar and browse filters."}
+            </p>
+          </div>
+          {editingId && (
+            <button type="button" onClick={resetForm} className="text-xs text-muted-foreground hover:text-foreground">
+              Cancel
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Name *</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value, slug: editingId ? f.slug : generateSlug(e.target.value) }))}
+              placeholder="e.g. UI Kits"
+              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Slug *</label>
+            <input
+              value={form.slug}
+              onChange={(e) => setForm((f) => ({ ...f, slug: generateSlug(e.target.value) }))}
+              placeholder="ui-kits"
+              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Icon</label>
+            <select
+              value={form.icon}
+              onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {iconOptions.map((icon) => (
+                <option key={icon} value={icon}>{icon}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} className="w-12 h-11 rounded-xl border border-border bg-background" />
+                <input value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} className="flex-1 min-w-0 px-3 py-3 rounded-xl border border-border bg-background text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Sort Order</label>
+              <input type="number" value={form.sort_order} onChange={(e) => setForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-destructive/20 border border-red-200 dark:border-destructive/30 rounded-xl px-4 py-3">
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+          {success && (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-3">
+              <CheckCircle size={14} /> {success}
+            </div>
+          )}
+
+          <button type="submit" disabled={saving} className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all">
+            {saving ? "Saving..." : editingId ? "Save Changes" : "Create Category"}
+          </button>
+        </form>
+      </div>
+
+      {/* RIGHT: List */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-lg font-display font-bold text-foreground">Existing Categories</h2>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-muted-foreground">Loading...</div>
+        ) : categories.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">No categories yet.</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {categories.map((cat) => (
+              <div key={cat.id} className={`px-5 py-4 flex items-center gap-4 ${editingId === cat.id ? "bg-primary/5" : ""}`}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-border" style={{ backgroundColor: `${cat.color}22`, color: cat.color }}>
+                  <Layers size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground truncate">{cat.name}</div>
+                  <div className="text-xs text-muted-foreground font-mono truncate">{cat.slug} · {cat.icon} · #{cat.sort_order}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startEdit(cat)}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                >
+                  Edit
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function AdminPage({ authUser, onNavigate }: {
+  authUser: AuthUser | null;
+  onNavigate: (p: Page) => void;
+}) {
+  const [tab, setTab] = useState<"products" | "categories" | "publishers">("products");
+
+  // حماية: مش أدمن → يرجع للـ home
+  if (!authUser || authUser.role !== "admin") {
+    return (
+      <main className="min-h-screen pt-24 pb-20 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-display font-bold text-foreground mb-2">Access denied</h1>
+          <p className="text-muted-foreground mb-6">You need admin access to view this page.</p>
+          <button
+            onClick={() => onNavigate("home")}
+            className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-bold text-sm"
+          >
+            Back to Home
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen pt-24 pb-20">
+      <div className="max-w-7xl mx-auto px-6 lg:px-10">
+        <div className="mb-8">
+          <h1 className="text-3xl font-display font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Manage products, categories, and publisher applications</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8 overflow-x-auto">
+          {[
+            { id: "products" as const, label: "Products" },
+            { id: "categories" as const, label: "Categories" },
+            { id: "publishers" as const, label: "Publisher Applications" },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                tab === t.id
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content placeholders */}
+        {tab === "products" && (
+          <div className="rounded-2xl border border-border bg-card p-8 text-muted-foreground">
+            Products management — coming next
+          </div>
+        )}
+        {tab === "categories" && (
+          <CategoriesAdminPanel />
+        )}
+        {tab === "publishers" && (
+  <PublisherApplicationsPanel />
+)}
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [page, setPage] = useState<Page>("home");
@@ -4202,7 +4670,7 @@ useEffect(() => {
 
     if (session?.user) {
       const user = session.user;
-      
+
       // Fetch user's wishlist from Supabase
       const { data: wishlistData, error: wishlistError } = await supabase
         .from('wishlist')
@@ -4216,18 +4684,24 @@ useEffect(() => {
       const wishlistIds = wishlistData?.map(w => w.product_id) || [];
       console.log('Loaded wishlist from Supabase:', wishlistIds);
 
+      // جلب الـ role من profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, full_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
       setAuthUser({
         id: user.id,
-        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+        name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
         email: user.email || "",
-        role: "user",
+        role: (profile?.role as "user" | "admin") || "user",
         purchases: [],
         wishlist: wishlistIds,
         createdAt: user.created_at || new Date().toISOString(),
       });
     }
   };
-
   restoreSession();
 
   // الاستماع لتغييرات الجلسة (تسجيل دخول / خروج)
@@ -4252,11 +4726,18 @@ useEffect(() => {
 
       const wishlistIds = wishlistData?.map(w => w.product_id) || [];
 
+      // جلب الـ role من profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, full_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
       setAuthUser({
         id: user.id,
-        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+        name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
         email: user.email || "",
-        role: "user",
+        role: (profile?.role as "user" | "admin") || "user",
         purchases: [],
         wishlist: wishlistIds,
         createdAt: user.created_at || new Date().toISOString(),
@@ -4265,7 +4746,7 @@ useEffect(() => {
       setAuthUser(null);
     }
   });
-
+  
   return () => subscription.unsubscribe();
 }, []);
 
@@ -4334,7 +4815,12 @@ useEffect(() => {
         // Fetch all products
         const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+              *,
+              downloads(count),
+              product_views(count),
+              reviews(rating)
+            `)
           .order('created_at', { ascending: false });
 
         if (productsError) {
@@ -4397,10 +4883,12 @@ useEffect(() => {
             supportsAutoLayout: p.supports_auto_layout || false,
             supportsLightDark: p.supports_light_dark || false,
             licenseType: p.license_type || 'personal',
-            downloadsCount: p.downloads_count || 0,
-            viewsCount: p.views_count || 0,
-            rating: p.rating || 0,
-            reviewsCount: p.reviews_count || 0,
+            downloadsCount: p.downloads?.[0]?.count ?? 0,
+            viewsCount: p.product_views?.[0]?.count ?? 0,
+            rating: Array.isArray(p.reviews) && p.reviews.length > 0
+              ? Math.round((p.reviews.reduce((s: number, r: any) => s + (r.rating || 0), 0) / p.reviews.length) * 10) / 10
+              : 0,
+            reviewsCount: Array.isArray(p.reviews) ? p.reviews.length : 0,
             downloadFileUrl: p.download_file_url || `https://cdn.example.com/files/${p.id}.zip`,
           };
         });
@@ -4420,8 +4908,12 @@ useEffect(() => {
   const handleAuthSuccess = (user: AuthUser) => {
     setAuthUser(user);
     setAuthModal(null);
+    if (user.role === "admin") {
+      setPage("admin");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
-
+  
 const handleLogout = async () => {
   await supabase.auth.signOut();
   setAuthUser(null);
@@ -4495,7 +4987,7 @@ const handleLogout = async () => {
           .insert({
             user_id: authUser.id,
             product_id: productId,
-            added_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
           });
 
         if (error) {
@@ -4577,6 +5069,12 @@ const handleLogout = async () => {
             onSearch={handleSearch}
             wishlistCount={authUser?.wishlist.length ?? 0}
             categories={categories}
+            onCategoryClick={(categoryId) => {
+              setBrowseFilters({ categoryId });
+              setPage("browse");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            activeCategoryId={page === "browse" ? (browseFilters.categoryId ?? null) : null}
           />
 
           {passwordRecovery && (
@@ -4688,8 +5186,18 @@ const handleLogout = async () => {
                   onProductClick={handleProductClick}
                   onWishlistToggle={handleWishlistToggle}
                   onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  products={products}
                 />
                 <Footer onNavigate={setPage} categories={categories} />
+              </motion.main>
+            )}
+
+            {page === "admin" && (
+              <motion.main key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                <AdminPage
+                  authUser={authUser}
+                  onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                />
               </motion.main>
             )}
 
