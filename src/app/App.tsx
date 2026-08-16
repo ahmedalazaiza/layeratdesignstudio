@@ -1462,7 +1462,7 @@ function StatsSection() {
 
 // ─── Categories Section ───────────────────────────────────────────────────────
 
-function CategoriesSection({ onCategoryClick }: { onCategoryClick: (cat: Category) => void }) {
+function CategoriesSection({ onCategoryClick, categories }: { onCategoryClick: (cat: Category) => void; categories: Category[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
@@ -1481,7 +1481,7 @@ function CategoriesSection({ onCategoryClick }: { onCategoryClick: (cat: Categor
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {CATEGORIES.map((cat, i) => (
+          {categories.map((cat, i) => (
             <motion.button key={cat.id}
               initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.1 }}
@@ -1647,12 +1647,13 @@ function Lightbox({ images, startIndex, onClose }: {
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAuthOpen }: {
+function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAuthOpen, categories }: {
   product: Product;
   onProductClick: (p: Product) => void;
   authUser: AuthUser | null;
   onWishlistToggle: (productId: string) => void;
   onAuthOpen: (mode: "login" | "register") => void;
+  categories: Category[];
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -1714,8 +1715,8 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
         {/* Category + arrow */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-            {CATEGORIES.find(c => c.id === product.categoryId)?.subcategories.find(s => s.id === product.subcategoryId)?.name
-              ?? CATEGORIES.find(c => c.id === product.categoryId)?.name}
+            {categories.find(c => c.id === product.categoryId)?.subcategories.find(s => s.id === product.subcategoryId)?.name
+              ?? categories.find(c => c.id === product.categoryId)?.name}
           </span>
           <ArrowUpRight size={16} className={`text-primary transition-all duration-300 ${hovered ? "opacity-100 translate-x-0.5 -translate-y-0.5" : "opacity-0"}`} />
         </div>
@@ -1765,7 +1766,7 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
 
 // ─── Featured Products ────────────────────────────────────────────────────────
 
-function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWishlistToggle, onAuthOpen }: {
+function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWishlistToggle, onAuthOpen, categories }: {
   products: Product[];
   
   onProductClick: (p: Product) => void;
@@ -1773,6 +1774,7 @@ function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWi
   authUser: AuthUser | null;
   onWishlistToggle: (id: string) => void;
   onAuthOpen: (mode: "login" | "register") => void;
+  categories: Category[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
@@ -1805,6 +1807,7 @@ function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWi
                 authUser={authUser}
                 onWishlistToggle={onWishlistToggle}
                 onAuthOpen={onAuthOpen}
+                categories={categories}
               />
             </motion.div>
           ))}
@@ -1871,15 +1874,17 @@ function HowItWorks() {
 
 // ─── Product Detail Page ──────────────────────────────────────────────────────
 
-function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle }: {
+function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle, categories }: {
   product: Product;
   onBack: () => void;
   authUser: AuthUser | null;
   onAuthOpen: (mode: "login" | "register") => void;
   onWishlistToggle: (id: string) => void;
+  categories: Category[];
 }) {
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading" | "success">("idle");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [alreadyDownloadedModal, setAlreadyDownloadedModal] = useState(false);
   const isOwned = authUser?.purchases.includes(product.id) ?? false;
   const isInWishlist = authUser?.wishlist.includes(product.id) ?? false;
 
@@ -1897,15 +1902,55 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
     if (product.isFree || isOwned) {
       setDownloadStatus("loading");
       try {
-        /*
-         * GET ${API_BASE}/products/${product.id}/download
-         * Backend returns a signed, time-limited URL to the actual file.
-         * The file should be served from S3 or a CDN with CORS headers.
-         */
-        await new Promise(r => setTimeout(r, 1200)); // remove when API is ready
+        // Check if user already downloaded this product
+        const { data: existingDownload, error: checkError } = await supabase
+          .from('downloads')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('product_id', product.id)
+          .single();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          // PGRST116 = no rows found (expected), other errors are real failures
+          console.error('Error checking downloads:', checkError);
+          setDownloadStatus("idle");
+          return;
+        }
+
+        // If already downloaded, show modal
+        if (existingDownload) {
+          setDownloadStatus("idle");
+          setAlreadyDownloadedModal(true);
+          return;
+        }
+
+        // First time download – insert into downloads table
+        const { error: insertError } = await supabase
+          .from('downloads')
+          .insert({
+            user_id: authUser.id,
+            product_id: product.id,
+            downloaded_at: new Date().toISOString(),
+          });
+
+        if (insertError) {
+          console.error('Error recording download:', insertError);
+          setDownloadStatus("idle");
+          return;
+        }
+
+        // Trigger file download using the secure URL
+        const link = document.createElement('a');
+        link.href = product.downloadFileUrl;
+        link.download = `${product.slug}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
         setDownloadStatus("success");
         setTimeout(() => setDownloadStatus("idle"), 3000);
-      } catch {
+      } catch (err) {
+        console.error('Download error:', err);
         setDownloadStatus("idle");
       }
       return;
@@ -1920,7 +1965,7 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
     alert(`Purchase flow: integrate Stripe here for $${product.price}`);
   };
 
-  const category = CATEGORIES.find(c => c.id === product.categoryId);
+  const category = categories.find(c => c.id === product.categoryId);
   const subcategory = category?.subcategories.find(s => s.id === product.subcategoryId);
 
   const specs = [
@@ -2189,18 +2234,79 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
           />
         )}
       </AnimatePresence>
+
+      {/* Already Downloaded Modal */}
+      <AnimatePresence>
+        {alreadyDownloadedModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setAlreadyDownloadedModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-md p-6 rounded-2xl bg-card border border-border shadow-xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <CheckCircle size={24} className="text-primary" />
+                </div>
+                <h3 className="text-lg font-display font-bold text-foreground">Already Downloaded</h3>
+              </div>
+              
+              <p className="text-muted-foreground text-sm mb-6">
+                You already downloaded this file. You can find it in your library or download it again.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setAlreadyDownloadedModal(false);
+                    handleGetResource(); // Download again
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-colors"
+                >
+                  Download Again
+                </button>
+                <button
+                  onClick={() => setAlreadyDownloadedModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-border text-foreground font-semibold text-sm hover:bg-muted/50 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
 
 // ─── Browse Page ──────────────────────────────────────────────────────────────
 
-function BrowsePage({ initialFilters, onProductClick, authUser, onWishlistToggle, onAuthOpen }: {
+function BrowsePage({
+  initialFilters,
+  onProductClick,
+  authUser,
+  onWishlistToggle,
+  onAuthOpen,
+  categories,
+  products,
+}: {
   initialFilters?: Partial<BrowseFilters>;
   onProductClick: (p: Product) => void;
   authUser: AuthUser | null;
   onWishlistToggle: (id: string) => void;
   onAuthOpen: (mode: "login" | "register") => void;
+  categories: Category[];
+  products: Product[];
 }) {
   const [filters, setFilters] = useState<BrowseFilters>({
     query: initialFilters?.query ?? "",
@@ -2226,7 +2332,7 @@ function BrowsePage({ initialFilters, onProductClick, authUser, onWishlistToggle
   // Client-side filter + sort
   // TODO: Replace with GET ${API_BASE}/products?q=&category=&subcategory=&isFree=&sort=&page=&limit=
   const filtered = useMemo(() => {
-    return PRODUCTS.filter(p => {
+    return products.filter(p => {
       if (filters.categoryId && p.categoryId !== filters.categoryId) return false;
       if (filters.subcategoryId && p.subcategoryId !== filters.subcategoryId) return false;
       if (filters.isFree !== null && p.isFree !== filters.isFree) return false;
@@ -2236,7 +2342,7 @@ function BrowsePage({ initialFilters, onProductClick, authUser, onWishlistToggle
           p.title.toLowerCase().includes(q) ||
           p.shortDescription.toLowerCase().includes(q) ||
           p.tags.some(t => t.toLowerCase().includes(q)) ||
-          CATEGORIES.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(q)
+          categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(q)
         );
       }
       return true;
@@ -2249,7 +2355,7 @@ function BrowsePage({ initialFilters, onProductClick, authUser, onWishlistToggle
         default: return parseInt(b.id.slice(1)) - parseInt(a.id.slice(1)); // newest by id
       }
     });
-  }, [filters]);
+  }, [filters, products, categories]);
 
   const Sidebar = () => (
     <div className="space-y-6">
@@ -2280,7 +2386,7 @@ function BrowsePage({ initialFilters, onProductClick, authUser, onWishlistToggle
             {!filters.categoryId && <Check size={13} />}
           </button>
 
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <div key={cat.id}>
               <button
                 onClick={() => {
@@ -2438,6 +2544,7 @@ function BrowsePage({ initialFilters, onProductClick, authUser, onWishlistToggle
                       authUser={authUser}
                       onWishlistToggle={onWishlistToggle}
                       onAuthOpen={onAuthOpen}
+                      categories={categories}
                     />
                   </motion.div>
                 ))}
@@ -2468,10 +2575,52 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
   const [pwStatus, setPwStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [libraryProducts, setLibraryProducts] = useState<Product[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
 
-  // Products the user owns or has in wishlist (lookup from mock data)
-  // TODO: GET ${API_BASE}/purchases  + GET ${API_BASE}/wishlist  (headers: Bearer token)
-  const libraryProducts = PRODUCTS.filter(p => authUser.purchases.includes(p.id) || p.isFree);
+  // Fetch downloaded products from Supabase
+  useEffect(() => {
+    const fetchDownloads = async () => {
+      try {
+        setLibraryLoading(true);
+        // Get downloads table entries for this user
+        const { data: downloads, error: downloadsError } = await supabase
+          .from('downloads')
+          .select('product_id')
+          .eq('user_id', authUser.id);
+
+        if (downloadsError) {
+          console.error('Error fetching downloads:', downloadsError);
+          setLibraryLoading(false);
+          return;
+        }
+
+        // Get the product details for each downloaded product
+        if (downloads && downloads.length > 0) {
+          const productIds = downloads.map(d => d.product_id);
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('*')
+            .in('id', productIds);
+
+          if (productsError) {
+            console.error('Error fetching products:', productsError);
+          } else {
+            setLibraryProducts(products || []);
+          }
+        }
+        setLibraryLoading(false);
+      } catch (err) {
+        console.error('Error fetching library:', err);
+        setLibraryLoading(false);
+      }
+    };
+
+    fetchDownloads();
+  }, [authUser.id]);
+
+  // Wishlist products from purchases state (keep mock data for now)
+  // TODO: GET ${API_BASE}/wishlist  (headers: Bearer token)
   const wishlistProducts = PRODUCTS.filter(p => authUser.wishlist.includes(p.id));
 
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -2597,7 +2746,12 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
           {/* Library tab */}
           {activeTab === "library" && (
             <motion.div key="library" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
-              {libraryProducts.length === 0 ? (
+              {libraryLoading ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-sm">Loading your library...</p>
+                </div>
+              ) : libraryProducts.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <Package size={40} className="mx-auto mb-4 opacity-30" />
                   <p className="font-semibold text-foreground mb-1">Your library is empty</p>
@@ -2614,11 +2768,7 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
                         <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">{p.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{p.shortDescription}</p>
                         <div className="flex items-center gap-1 mt-2">
-                          {p.isFree ? (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">Free</span>
-                          ) : (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">Purchased</span>
-                          )}
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">Downloaded</span>
                         </div>
                       </div>
                     </div>
@@ -3482,7 +3632,7 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
-function Footer({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; categories: Category[] }) {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
@@ -3507,7 +3657,7 @@ function Footer({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <div>
             <h4 className="text-sm font-display font-bold text-foreground mb-4">Categories</h4>
             <ul className="space-y-2">
-              {CATEGORIES.map(cat => (
+              {categories.map(cat => (
                 <li key={cat.id}>
                   <button onClick={() => onNavigate("browse")}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors text-left">
@@ -3919,7 +4069,7 @@ const handleLogout = async () => {
           <motion.main key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
             <Hero onSearch={handleSearch} onNavigate={setPage} onAuthOpen={setAuthModal} />
             <StatsSection />
-            <CategoriesSection onCategoryClick={handleCategoryClick} />
+            <CategoriesSection onCategoryClick={handleCategoryClick} categories={categories} />
             <FeaturedProducts
               products={products}
               onProductClick={handleProductClick}
@@ -3927,9 +4077,10 @@ const handleLogout = async () => {
               authUser={authUser}
               onWishlistToggle={handleWishlistToggle}
               onAuthOpen={setAuthModal}
+              categories={categories}
             />
         <HowItWorks />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
@@ -3941,8 +4092,10 @@ const handleLogout = async () => {
               authUser={authUser}
               onWishlistToggle={handleWishlistToggle}
               onAuthOpen={setAuthModal}
+              categories={categories}
+              products={products}
             />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
@@ -3954,8 +4107,9 @@ const handleLogout = async () => {
               authUser={authUser}
               onAuthOpen={setAuthModal}
               onWishlistToggle={handleWishlistToggle}
+              categories={categories}
             />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
@@ -3967,28 +4121,28 @@ const handleLogout = async () => {
               onLogout={handleLogout}
               onProductClick={handleProductClick}
             />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
         {page === "publisher" && (
           <motion.main key="publisher" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
             <PublisherPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
         {page === "team" && (
           <motion.main key="team" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
             <TeamPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
         {page === "about" && (
           <motion.main key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
             <AboutPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
@@ -4000,7 +4154,7 @@ const handleLogout = async () => {
               onWishlistToggle={handleWishlistToggle}
               onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             />
-            <Footer onNavigate={setPage} />
+            <Footer onNavigate={setPage} categories={categories} />
           </motion.main>
         )}
 
