@@ -1780,6 +1780,8 @@ function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWi
   const inView = useInView(ref, { once: true, margin: "-60px" });
   // TODO: Replace with GET ${API_BASE}/products/featured
   const featured = products.slice(0, 6);
+  
+  console.log('Featured products prop received:', products.length, 'products, featured slice:', featured.length);
 
   return (
     <section id="featured" ref={ref} className="py-24 lg:py-32">
@@ -2577,6 +2579,8 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
   const [pwStatus, setPwStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [libraryProducts, setLibraryProducts] = useState<Product[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(true);
+  const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
+  const [wishlistLoading, setWishlistLoading] = useState(true);
 
   // Fetch downloaded products from Supabase
   useEffect(() => {
@@ -2619,9 +2623,48 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
     fetchDownloads();
   }, [authUser.id]);
 
-  // Wishlist products from purchases state (keep mock data for now)
-  // TODO: GET ${API_BASE}/wishlist  (headers: Bearer token)
-  const wishlistProducts = PRODUCTS.filter(p => authUser.wishlist.includes(p.id));
+  // Fetch wishlist products from Supabase
+  useEffect(() => {
+    const fetchWishlist = async () => {
+      try {
+        setWishlistLoading(true);
+        // Get wishlist entries for this user
+        const { data: wishlist, error: wishlistError } = await supabase
+          .from('wishlist')
+          .select('product_id')
+          .eq('user_id', authUser.id);
+
+        if (wishlistError) {
+          console.error('Error fetching wishlist:', wishlistError);
+          setWishlistLoading(false);
+          return;
+        }
+
+        // Get the product details for each wishlisted product
+        if (wishlist && wishlist.length > 0) {
+          const productIds = wishlist.map(w => w.product_id);
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('*')
+            .in('id', productIds);
+
+          if (productsError) {
+            console.error('Error fetching products:', productsError);
+          } else {
+            setWishlistProducts(products || []);
+          }
+        } else {
+          setWishlistProducts([]);
+        }
+        setWishlistLoading(false);
+      } catch (err) {
+        console.error('Error fetching wishlist:', err);
+        setWishlistLoading(false);
+      }
+    };
+
+    fetchWishlist();
+  }, [authUser.id]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2781,7 +2824,12 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
           {/* Wishlist tab */}
           {activeTab === "wishlist" && (
             <motion.div key="wishlist" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
-              {wishlistProducts.length === 0 ? (
+              {wishlistLoading ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-sm">Loading your wishlist...</p>
+                </div>
+              ) : wishlistProducts.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <Heart size={40} className="mx-auto mb-4 opacity-30" />
                   <p className="font-semibold text-foreground mb-1">Nothing saved yet</p>
@@ -3878,13 +3926,27 @@ useEffect(() => {
 
     if (session?.user) {
       const user = session.user;
+      
+      // Fetch user's wishlist from Supabase
+      const { data: wishlistData, error: wishlistError } = await supabase
+        .from('wishlist')
+        .select('product_id')
+        .eq('user_id', user.id);
+
+      if (wishlistError) {
+        console.error('Error fetching wishlist:', wishlistError);
+      }
+
+      const wishlistIds = wishlistData?.map(w => w.product_id) || [];
+      console.log('Loaded wishlist from Supabase:', wishlistIds);
+
       setAuthUser({
         id: user.id,
         name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
         email: user.email || "",
         role: "user",
         purchases: [],
-        wishlist: [],
+        wishlist: wishlistIds,
         createdAt: user.created_at || new Date().toISOString(),
       });
     }
@@ -3893,16 +3955,29 @@ useEffect(() => {
   restoreSession();
 
   // الاستماع لتغييرات الجلسة (تسجيل دخول / خروج)
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
     if (session?.user) {
       const user = session.user;
+      
+      // Fetch user's wishlist from Supabase
+      const { data: wishlistData, error: wishlistError } = await supabase
+        .from('wishlist')
+        .select('product_id')
+        .eq('user_id', user.id);
+
+      if (wishlistError) {
+        console.error('Error fetching wishlist:', wishlistError);
+      }
+
+      const wishlistIds = wishlistData?.map(w => w.product_id) || [];
+
       setAuthUser({
         id: user.id,
         name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
         email: user.email || "",
         role: "user",
         purchases: [],
-        wishlist: [],
+        wishlist: wishlistIds,
         createdAt: user.created_at || new Date().toISOString(),
       });
     } else {
@@ -3969,8 +4044,98 @@ useEffect(() => {
 
     fetchCategories();
   }, []);
-  
-  
+
+  // Fetch products from Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setProductsLoading(true);
+      try {
+        // Fetch all products
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (productsError) {
+          console.error('Error fetching products:', productsError);
+          setProductsLoading(false);
+          return;
+        }
+
+        console.log('Fetched products:', productsData);
+
+        if (!productsData || productsData.length === 0) {
+          console.log('No products found');
+          setProducts([]);
+          setProductsLoading(false);
+          return;
+        }
+
+        // Fetch product images
+        const { data: imagesData, error: imagesError } = await supabase
+          .from('product_images')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (imagesError) {
+          console.error('Error fetching product images:', imagesError);
+          // Continue anyway, just won't have images
+        }
+
+        console.log('Fetched product images:', imagesData);
+
+        // Parse tags from JSON and map products
+        const mapped: Product[] = (productsData || []).map((p: any) => {
+          // Get gallery images for this product
+          const productImages = (imagesData || [])
+            .filter((img: any) => img.product_id === p.id)
+            .map((img: any) => img.image_url);
+
+          return {
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            shortDescription: p.short_description,
+            fullDescription: p.full_description,
+            price: p.price || 0,
+            discountPrice: p.discount_price,
+            currency: p.currency || 'USD',
+            isFree: p.is_free || p.price === 0,
+            thumbnail: p.thumbnail_url,
+            galleryImages: productImages.length > 0 ? productImages : [p.thumbnail_url],
+            figmaPreviewUrl: p.figma_preview_url,
+            categoryId: p.category_id,
+            subcategoryId: p.subcategory_id,
+            tags: Array.isArray(p.tags) ? p.tags : (p.tags ? JSON.parse(p.tags) : []),
+            fileSize: p.file_size,
+            formats: Array.isArray(p.formats) ? p.formats : (p.formats ? JSON.parse(p.formats) : []),
+            screensCount: p.screens_count || 0,
+            componentsCount: p.components_count || 0,
+            version: p.version,
+            supportsVariables: p.supports_variables || false,
+            supportsAutoLayout: p.supports_auto_layout || false,
+            supportsLightDark: p.supports_light_dark || false,
+            licenseType: p.license_type || 'personal',
+            downloadsCount: p.downloads_count || 0,
+            viewsCount: p.views_count || 0,
+            rating: p.rating || 0,
+            reviewsCount: p.reviews_count || 0,
+            downloadFileUrl: p.download_file_url || `https://cdn.example.com/files/${p.id}.zip`,
+          };
+        });
+
+        console.log('Mapped products:', mapped);
+        setProducts(mapped);
+        setProductsLoading(false);
+      } catch (err) {
+        console.error('Unexpected error fetching products:', err);
+        setProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   const handleAuthSuccess = (user: AuthUser) => {
     setAuthUser(user);
     setAuthModal(null);
@@ -4010,16 +4175,61 @@ const handleLogout = async () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Toggle product in wishlist – optimistic update
-  // TODO: POST ${API_BASE}/wishlist/:productId  to persist on backend
-  const handleWishlistToggle = (productId: string) => {
-    setAuthUser(u => {
-      if (!u) return u;
-      const inList = u.wishlist.includes(productId);
-      const updated = { ...u, wishlist: inList ? u.wishlist.filter(id => id !== productId) : [...u.wishlist, productId] };
-      localStorage.setItem("ld_user", JSON.stringify(updated));
-      return updated;
-    });
+  // Toggle product in wishlist – update Supabase with optimistic local update
+  const handleWishlistToggle = async (productId: string) => {
+    if (!authUser) return;
+
+    const inWishlist = authUser.wishlist.includes(productId);
+
+    // Optimistic update
+    const updated = {
+      ...authUser,
+      wishlist: inWishlist
+        ? authUser.wishlist.filter(id => id !== productId)
+        : [...authUser.wishlist, productId]
+    };
+    setAuthUser(updated);
+
+    // Persist to Supabase
+    try {
+      if (inWishlist) {
+        // Remove from wishlist
+        const { error } = await supabase
+          .from('wishlist')
+          .delete()
+          .eq('user_id', authUser.id)
+          .eq('product_id', productId);
+
+        if (error) {
+          console.error('Error removing from wishlist:', error);
+          // Revert optimistic update
+          setAuthUser(authUser);
+        } else {
+          console.log('Removed from wishlist:', productId);
+        }
+      } else {
+        // Add to wishlist
+        const { error } = await supabase
+          .from('wishlist')
+          .insert({
+            user_id: authUser.id,
+            product_id: productId,
+            added_at: new Date().toISOString(),
+          });
+
+        if (error) {
+          console.error('Error adding to wishlist:', error);
+          // Revert optimistic update
+          setAuthUser(authUser);
+        } else {
+          console.log('Added to wishlist:', productId);
+        }
+      }
+    } catch (err) {
+      console.error('Unexpected error toggling wishlist:', err);
+      // Revert optimistic update
+      setAuthUser(authUser);
+    }
   };
 
   const handleProfileUpdate = (updates: Partial<AuthUser>) => {
