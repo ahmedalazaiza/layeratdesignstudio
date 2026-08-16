@@ -1,13 +1,56 @@
 import { supabase } from "../lib/supabase";
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { motion, useInView, AnimatePresence } from "motion/react";
 import {
-  Sun, Moon, Menu, X, Search, EyeOff, ChevronLeft, ChevronDown, ChevronRight,
-  Star, Download, Eye, Heart, ArrowUpRight, Check, User, Settings,
-  LogOut, Package, Layers, Smartphone, FileText, Layout, Bell, Lock,
-  Mail, CheckCircle, Filter, ExternalLink, Bookmark, Award, Clock,
-  Users, Briefcase, Plus, Minus, Globe, AlertCircle, Send, Shield,
-  Zap, Code, MapPin
+  Sun,
+  Moon,
+  Menu,
+  X,
+  Search,
+  EyeOff,
+  ChevronLeft,
+  ChevronDown,
+  ChevronRight,
+  Star,
+  Download,
+  Eye,
+  Heart,
+  ArrowUpRight,
+  Check,
+  User,
+  Settings,
+  LogOut,
+  Package,
+  Layers,
+  Smartphone,
+  FileText,
+  Layout,
+  Bell,
+  Lock,
+  Mail,
+  CheckCircle,
+  Filter,
+  ExternalLink,
+  Bookmark,
+  Award,
+  Clock,
+  Users,
+  Briefcase,
+  Plus,
+  Minus,
+  Globe,
+  AlertCircle,
+  Send,
+  Shield,
+  Zap,
+  Code,
+  MapPin,
 } from "lucide-react";
 
 // ─── Backend Config ──────────────────────────────────────────────────────────
@@ -90,7 +133,16 @@ export const API_BASE: string =
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Page = "home" | "browse" | "product" | "profile" | "publisher" | "team" | "about" | "favorites" | "admin";
+type Page =
+  | "home"
+  | "browse"
+  | "product"
+  | "profile"
+  | "publisher"
+  | "team"
+  | "about"
+  | "favorites"
+  | "admin";
 
 interface Subcategory {
   id: string;
@@ -113,22 +165,22 @@ interface Product {
   slug: string;
   shortDescription: string;
   fullDescription: string;
-  price: number;           // USD; 0 when isFree
-  discountPrice?: number;  // active sale price
-  currency: string;        // "USD"
+  price: number; // USD; 0 when isFree
+  discountPrice?: number; // active sale price
+  currency: string; // "USD"
   isFree: boolean;
-  thumbnail: string;       // cover image URL
+  thumbnail: string; // cover image URL
   galleryImages: string[]; // 6+ preview images for detail page
   figmaPreviewUrl?: string; // Figma Community or embed URL
   categoryId: string;
   subcategoryId: string;
   tags: string[];
   // File specs
-  fileSize: string;          // e.g. "18.4 MB"
-  formats: string[];         // ["Figma"] or ["Figma", "Sketch"]
+  fileSize: string; // e.g. "18.4 MB"
+  formats: string[]; // ["Figma"] or ["Figma", "Sketch"]
   screensCount: number;
   componentsCount: number;
-  version: string;           // e.g. "v2.0.0"
+  version: string; // e.g. "v2.0.0"
   // Figma feature flags (show as badges in detail)
   supportsVariables: boolean;
   supportsAutoLayout: boolean;
@@ -138,7 +190,7 @@ interface Product {
   // Stats – read from /products/:id/stats or embed in product response
   downloadsCount: number;
   viewsCount: number;
-  rating: number;        // 0–5 float
+  rating: number; // 0–5 float
   reviewsCount: number;
   // Secure download URL – backend returns a signed, time-limited link
   downloadFileUrl: string;
@@ -149,20 +201,20 @@ interface AuthUser {
   id: string;
   name: string;
   email: string;
-  avatar?: string;    // URL; null → show initials fallback
+  avatar?: string; // URL; null → show initials fallback
   bio?: string;
   website?: string;
   role: "user" | "creator" | "admin";
-  purchases: string[];  // product IDs
-  wishlist: string[];   // product IDs
-  createdAt: string;    // ISO 8601
+  purchases: string[]; // product IDs
+  wishlist: string[]; // product IDs
+  createdAt: string; // ISO 8601
 }
 
 interface BrowseFilters {
   query: string;
   categoryId: string | null;
   subcategoryId: string | null;
-  isFree: boolean | null;   // null = show all
+  isFree: boolean | null; // null = show all
   sortBy: "newest" | "downloads" | "rating" | "price-asc" | "price-desc";
 }
 
@@ -171,42 +223,94 @@ interface BrowseFilters {
 
 const CATEGORIES: Category[] = [
   {
-    id: "ui-kits", name: "UI Kits & Systems", slug: "ui-kits",
-    icon: Layers, color: "#aaff38",
+    id: "ui-kits",
+    name: "UI Kits & Systems",
+    slug: "ui-kits",
+    icon: Layers,
+    color: "#aaff38",
     subcategories: [
-      { id: "mobile-ui", name: "Mobile UI Kits (iOS & Android)", slug: "mobile-ui" },
+      {
+        id: "mobile-ui",
+        name: "Mobile UI Kits (iOS & Android)",
+        slug: "mobile-ui",
+      },
       { id: "web-saas-ui", name: "Web & SaaS UI Kits", slug: "web-saas-ui" },
-      { id: "design-systems", name: "Design Systems & Tokens", slug: "design-systems" },
-      { id: "dashboard-admin", name: "Dashboard & Admin Kits", slug: "dashboard-admin" },
+      {
+        id: "design-systems",
+        name: "Design Systems & Tokens",
+        slug: "design-systems",
+      },
+      {
+        id: "dashboard-admin",
+        name: "Dashboard & Admin Kits",
+        slug: "dashboard-admin",
+      },
     ],
   },
   {
-    id: "templates", name: "Templates & Landing Pages", slug: "templates",
-    icon: Layout, color: "#60a5fa",
+    id: "templates",
+    name: "Templates & Landing Pages",
+    slug: "templates",
+    icon: Layout,
+    color: "#60a5fa",
     subcategories: [
-      { id: "saas-landing", name: "SaaS & Tech Landing Pages", slug: "saas-landing" },
-      { id: "portfolio-agency", name: "Portfolio & Agency", slug: "portfolio-agency" },
+      {
+        id: "saas-landing",
+        name: "SaaS & Tech Landing Pages",
+        slug: "saas-landing",
+      },
+      {
+        id: "portfolio-agency",
+        name: "Portfolio & Agency",
+        slug: "portfolio-agency",
+      },
       { id: "ecommerce", name: "E-Commerce Websites", slug: "ecommerce" },
-      { id: "mobile-web", name: "Mobile Responsive Web Apps", slug: "mobile-web" },
+      {
+        id: "mobile-web",
+        name: "Mobile Responsive Web Apps",
+        slug: "mobile-web",
+      },
     ],
   },
   {
-    id: "wireframes", name: "Wireframes & UX Flows", slug: "wireframes",
-    icon: FileText, color: "#f59e0b",
+    id: "wireframes",
+    name: "Wireframes & UX Flows",
+    slug: "wireframes",
+    icon: FileText,
+    color: "#f59e0b",
     subcategories: [
-      { id: "wireframe-kits", name: "Low-Fidelity & High-Fidelity Wireframes", slug: "wireframe-kits" },
-      { id: "user-flows", name: "User Flows & Journey Maps", slug: "user-flows" },
+      {
+        id: "wireframe-kits",
+        name: "Low-Fidelity & High-Fidelity Wireframes",
+        slug: "wireframe-kits",
+      },
+      {
+        id: "user-flows",
+        name: "User Flows & Journey Maps",
+        slug: "user-flows",
+      },
       { id: "ia-kits", name: "Information Architecture Kits", slug: "ia-kits" },
-      { id: "ux-audit", name: "UX Audit & Heuristic Templates", slug: "ux-audit" },
+      {
+        id: "ux-audit",
+        name: "UX Audit & Heuristic Templates",
+        slug: "ux-audit",
+      },
     ],
   },
   {
-    id: "icons-assets", name: "Icons & Visual Assets", slug: "icons-assets",
-    icon: Package, color: "#c084fc",
+    id: "icons-assets",
+    name: "Icons & Visual Assets",
+    slug: "icons-assets",
+    icon: Package,
+    color: "#c084fc",
     subcategories: [
       { id: "3d-assets", name: "3D UI Assets", slug: "3d-assets" },
       { id: "vector-icons", name: "Vector System Icons", slug: "vector-icons" },
-      { id: "lottie-icons", name: "Animated Lottie Icons", slug: "lottie-icons" },
+      {
+        id: "lottie-icons",
+        name: "Animated Lottie Icons",
+        slug: "lottie-icons",
+      },
       { id: "device-mockups", name: "Device Mockups", slug: "device-mockups" },
     ],
   },
@@ -215,12 +319,18 @@ const CATEGORIES: Category[] = [
 // TODO: Replace with GET ${API_BASE}/products (paginated)
 const PRODUCTS: Product[] = [
   {
-    id: "p1", slug: "orbit-saas-ui-kit",
+    id: "p1",
+    slug: "orbit-saas-ui-kit",
     title: "Orbit SaaS UI Kit",
-    shortDescription: "Complete SaaS product UI kit with 180+ screens — dashboards, onboarding, auth, settings and more.",
-    fullDescription: "Orbit is a premium Figma UI kit built for modern SaaS products. Covering every core flow from landing pages to complex dashboards, Orbit ships with 180 screens across 12 categories, 340+ auto-layout components, a full token system compatible with Figma Variables, and both light and dark mode. Built with real product teams in mind — every component is structured, named, and documented for smooth developer handoff.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "Complete SaaS product UI kit with 180+ screens — dashboards, onboarding, auth, settings and more.",
+    fullDescription:
+      "Orbit is a premium Figma UI kit built for modern SaaS products. Covering every core flow from landing pages to complex dashboards, Orbit ships with 180 screens across 12 categories, 340+ auto-layout components, a full token system compatible with Figma Variables, and both light and dark mode. Built with real product teams in mind — every component is structured, named, and documented for smooth developer handoff.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=900&h=620&fit=crop&auto=format",
@@ -230,22 +340,44 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1516321165247-4aa89a48be55?w=900&h=620&fit=crop&auto=format",
     ],
     figmaPreviewUrl: "https://www.figma.com/community",
-    categoryId: "ui-kits", subcategoryId: "web-saas-ui",
-    tags: ["SaaS", "Dashboard", "Web", "Dark Mode", "Components", "Design System"],
-    fileSize: "24.2 MB", formats: ["Figma"], screensCount: 180,
-    componentsCount: 340, version: "v2.1.0",
-    supportsVariables: true, supportsAutoLayout: true, supportsLightDark: true,
+    categoryId: "ui-kits",
+    subcategoryId: "web-saas-ui",
+    tags: [
+      "SaaS",
+      "Dashboard",
+      "Web",
+      "Dark Mode",
+      "Components",
+      "Design System",
+    ],
+    fileSize: "24.2 MB",
+    formats: ["Figma"],
+    screensCount: 180,
+    componentsCount: 340,
+    version: "v2.1.0",
+    supportsVariables: true,
+    supportsAutoLayout: true,
+    supportsLightDark: true,
     licenseType: "commercial",
-    downloadsCount: 3820, viewsCount: 14200, rating: 4.9, reviewsCount: 187,
+    downloadsCount: 3820,
+    viewsCount: 14200,
+    rating: 4.9,
+    reviewsCount: 187,
     downloadFileUrl: `${API_BASE}/products/p1/download`,
   },
   {
-    id: "p2", slug: "mobilefirst-ios-kit",
+    id: "p2",
+    slug: "mobilefirst-ios-kit",
     title: "MobileFirst iOS UI Kit",
-    shortDescription: "120 screens crafted to iOS Human Interface Guidelines — fully customizable, production-ready.",
-    fullDescription: "MobileFirst is a comprehensive iOS UI kit designed to align perfectly with Apple Human Interface Guidelines while staying highly customizable. It covers all common mobile app flows: auth, home feeds, profiles, settings, messaging, e-commerce, and more. All components use Auto Layout, and the kit ships with a Figma Variables token system to switch themes in seconds.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "120 screens crafted to iOS Human Interface Guidelines — fully customizable, production-ready.",
+    fullDescription:
+      "MobileFirst is a comprehensive iOS UI kit designed to align perfectly with Apple Human Interface Guidelines while staying highly customizable. It covers all common mobile app flows: auth, home feeds, profiles, settings, messaging, e-commerce, and more. All components use Auto Layout, and the kit ships with a Figma Variables token system to switch themes in seconds.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1607252650355-f7fd0460ccdb?w=900&h=620&fit=crop&auto=format",
@@ -254,22 +386,37 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "ui-kits", subcategoryId: "mobile-ui",
+    categoryId: "ui-kits",
+    subcategoryId: "mobile-ui",
     tags: ["iOS", "Mobile", "iPhone", "SwiftUI", "Auto Layout", "Variables"],
-    fileSize: "18.8 MB", formats: ["Figma"], screensCount: 120,
-    componentsCount: 260, version: "v1.4.0",
-    supportsVariables: true, supportsAutoLayout: true, supportsLightDark: true,
+    fileSize: "18.8 MB",
+    formats: ["Figma"],
+    screensCount: 120,
+    componentsCount: 260,
+    version: "v1.4.0",
+    supportsVariables: true,
+    supportsAutoLayout: true,
+    supportsLightDark: true,
     licenseType: "commercial",
-    downloadsCount: 2140, viewsCount: 9800, rating: 4.8, reviewsCount: 124,
+    downloadsCount: 2140,
+    viewsCount: 9800,
+    rating: 4.8,
+    reviewsCount: 124,
     downloadFileUrl: `${API_BASE}/products/p2/download`,
   },
   {
-    id: "p3", slug: "flowmaster-ux-kit",
+    id: "p3",
+    slug: "flowmaster-ux-kit",
     title: "FlowMaster UX Flow Kit",
-    shortDescription: "Free user flow & journey map kit — 60+ ready-made flow templates for any product type.",
-    fullDescription: "FlowMaster is a free Figma resource for UX designers who want to document and communicate product flows faster. The kit includes 60+ pre-built flow diagrams covering e-commerce checkouts, onboarding journeys, mobile app navigation trees, and service blueprints. Every diagram uses a consistent visual language with clear annotation components, decision nodes, and swimlane templates.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "Free user flow & journey map kit — 60+ ready-made flow templates for any product type.",
+    fullDescription:
+      "FlowMaster is a free Figma resource for UX designers who want to document and communicate product flows faster. The kit includes 60+ pre-built flow diagrams covering e-commerce checkouts, onboarding journeys, mobile app navigation trees, and service blueprints. Every diagram uses a consistent visual language with clear annotation components, decision nodes, and swimlane templates.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=900&h=620&fit=crop&auto=format",
@@ -278,22 +425,44 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "wireframes", subcategoryId: "user-flows",
-    tags: ["User Flows", "Journey Maps", "UX", "Free", "Flowchart", "Service Blueprint"],
-    fileSize: "8.1 MB", formats: ["Figma"], screensCount: 60,
-    componentsCount: 140, version: "v1.0.0",
-    supportsVariables: false, supportsAutoLayout: true, supportsLightDark: false,
+    categoryId: "wireframes",
+    subcategoryId: "user-flows",
+    tags: [
+      "User Flows",
+      "Journey Maps",
+      "UX",
+      "Free",
+      "Flowchart",
+      "Service Blueprint",
+    ],
+    fileSize: "8.1 MB",
+    formats: ["Figma"],
+    screensCount: 60,
+    componentsCount: 140,
+    version: "v1.0.0",
+    supportsVariables: false,
+    supportsAutoLayout: true,
+    supportsLightDark: false,
     licenseType: "personal",
-    downloadsCount: 8760, viewsCount: 31000, rating: 4.7, reviewsCount: 342,
+    downloadsCount: 8760,
+    viewsCount: 31000,
+    rating: 4.7,
+    reviewsCount: 342,
     downloadFileUrl: `${API_BASE}/products/p3/download`,
   },
   {
-    id: "p4", slug: "dashpro-admin-kit",
+    id: "p4",
+    slug: "dashpro-admin-kit",
     title: "DashPro Admin Kit",
-    shortDescription: "Enterprise-grade admin dashboard kit — data tables, charts, user management, and 90+ components.",
-    fullDescription: "DashPro is purpose-built for enterprise admin interfaces. Forget generic dashboards — DashPro covers every admin use case: user management panels, permission matrices, complex data tables with inline editing, multi-chart analytics pages, notification systems, and audit logs. Designed for handoff efficiency: every component is annotated with interaction states and responsive breakpoints.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "Enterprise-grade admin dashboard kit — data tables, charts, user management, and 90+ components.",
+    fullDescription:
+      "DashPro is purpose-built for enterprise admin interfaces. Forget generic dashboards — DashPro covers every admin use case: user management panels, permission matrices, complex data tables with inline editing, multi-chart analytics pages, notification systems, and audit logs. Designed for handoff efficiency: every component is annotated with interaction states and responsive breakpoints.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=900&h=620&fit=crop&auto=format",
@@ -302,22 +471,44 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "ui-kits", subcategoryId: "dashboard-admin",
-    tags: ["Admin", "Dashboard", "Enterprise", "Data Tables", "Charts", "Analytics"],
-    fileSize: "31.5 MB", formats: ["Figma"], screensCount: 95,
-    componentsCount: 420, version: "v3.0.1",
-    supportsVariables: true, supportsAutoLayout: true, supportsLightDark: true,
+    categoryId: "ui-kits",
+    subcategoryId: "dashboard-admin",
+    tags: [
+      "Admin",
+      "Dashboard",
+      "Enterprise",
+      "Data Tables",
+      "Charts",
+      "Analytics",
+    ],
+    fileSize: "31.5 MB",
+    formats: ["Figma"],
+    screensCount: 95,
+    componentsCount: 420,
+    version: "v3.0.1",
+    supportsVariables: true,
+    supportsAutoLayout: true,
+    supportsLightDark: true,
     licenseType: "commercial",
-    downloadsCount: 1980, viewsCount: 8400, rating: 4.9, reviewsCount: 98,
+    downloadsCount: 1980,
+    viewsCount: 8400,
+    rating: 4.9,
+    reviewsCount: 98,
     downloadFileUrl: `${API_BASE}/products/p4/download`,
   },
   {
-    id: "p5", slug: "nexus-design-system",
+    id: "p5",
+    slug: "nexus-design-system",
     title: "Nexus Design System",
-    shortDescription: "Production-grade Figma design system with 600+ components, token library, and full documentation.",
-    fullDescription: "Nexus is the most comprehensive design system kit in our library. Built to bridge the gap between design and code, Nexus ships with 600+ components organized across 18 categories, a complete Figma Variables token architecture covering colors, typography, spacing, shadows, and radii, plus a documentation template you can fill in and share with your team. Light, dark, and high-contrast modes included.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "Production-grade Figma design system with 600+ components, token library, and full documentation.",
+    fullDescription:
+      "Nexus is the most comprehensive design system kit in our library. Built to bridge the gap between design and code, Nexus ships with 600+ components organized across 18 categories, a complete Figma Variables token architecture covering colors, typography, spacing, shadows, and radii, plus a documentation template you can fill in and share with your team. Light, dark, and high-contrast modes included.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=900&h=620&fit=crop&auto=format",
@@ -326,22 +517,44 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1559028012-481c04fa702d?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "ui-kits", subcategoryId: "design-systems",
-    tags: ["Design System", "Tokens", "Variables", "Components", "Documentation", "Atomic Design"],
-    fileSize: "52.8 MB", formats: ["Figma"], screensCount: 0,
-    componentsCount: 620, version: "v4.2.0",
-    supportsVariables: true, supportsAutoLayout: true, supportsLightDark: true,
+    categoryId: "ui-kits",
+    subcategoryId: "design-systems",
+    tags: [
+      "Design System",
+      "Tokens",
+      "Variables",
+      "Components",
+      "Documentation",
+      "Atomic Design",
+    ],
+    fileSize: "52.8 MB",
+    formats: ["Figma"],
+    screensCount: 0,
+    componentsCount: 620,
+    version: "v4.2.0",
+    supportsVariables: true,
+    supportsAutoLayout: true,
+    supportsLightDark: true,
     licenseType: "commercial",
-    downloadsCount: 4310, viewsCount: 19600, rating: 5.0, reviewsCount: 261,
+    downloadsCount: 4310,
+    viewsCount: 19600,
+    rating: 5.0,
+    reviewsCount: 261,
     downloadFileUrl: `${API_BASE}/products/p5/download`,
   },
   {
-    id: "p6", slug: "launchpad-saas-landing",
+    id: "p6",
+    slug: "launchpad-saas-landing",
     title: "LaunchPad SaaS Landing",
-    shortDescription: "High-converting SaaS landing page template — hero, features, pricing, testimonials, FAQ and footer.",
-    fullDescription: "LaunchPad is a conversion-optimized landing page template for SaaS startups and tech products. It includes 14 pre-designed sections covering every element of a great SaaS landing page: hero with social proof, feature grids, product screenshots, pricing tables, customer testimonials, comparison tables, FAQ accordions, and newsletter CTAs. Fully responsive across mobile, tablet, and desktop.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "High-converting SaaS landing page template — hero, features, pricing, testimonials, FAQ and footer.",
+    fullDescription:
+      "LaunchPad is a conversion-optimized landing page template for SaaS startups and tech products. It includes 14 pre-designed sections covering every element of a great SaaS landing page: hero with social proof, feature grids, product screenshots, pricing tables, customer testimonials, comparison tables, FAQ accordions, and newsletter CTAs. Fully responsive across mobile, tablet, and desktop.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1559028012-481c04fa702d?w=900&h=620&fit=crop&auto=format",
@@ -350,22 +563,44 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "templates", subcategoryId: "saas-landing",
-    tags: ["Landing Page", "SaaS", "Startup", "Marketing", "Responsive", "Conversion"],
-    fileSize: "11.3 MB", formats: ["Figma"], screensCount: 14,
-    componentsCount: 85, version: "v1.2.0",
-    supportsVariables: false, supportsAutoLayout: true, supportsLightDark: true,
+    categoryId: "templates",
+    subcategoryId: "saas-landing",
+    tags: [
+      "Landing Page",
+      "SaaS",
+      "Startup",
+      "Marketing",
+      "Responsive",
+      "Conversion",
+    ],
+    fileSize: "11.3 MB",
+    formats: ["Figma"],
+    screensCount: 14,
+    componentsCount: 85,
+    version: "v1.2.0",
+    supportsVariables: false,
+    supportsAutoLayout: true,
+    supportsLightDark: true,
     licenseType: "commercial",
-    downloadsCount: 5620, viewsCount: 22400, rating: 4.8, reviewsCount: 318,
+    downloadsCount: 5620,
+    viewsCount: 22400,
+    rating: 4.8,
+    reviewsCount: 318,
     downloadFileUrl: `${API_BASE}/products/p6/download`,
   },
   {
-    id: "p7", slug: "iconvault-vector-pack",
+    id: "p7",
+    slug: "iconvault-vector-pack",
     title: "IconVault Vector Pack",
-    shortDescription: "2,400+ consistent vector icons in outline, filled, and duotone styles — organized and ready to export.",
-    fullDescription: "IconVault gives you 2,400 vector icons across 80 categories — from interface basics to industry-specific sets like finance, healthcare, logistics, and travel. Three visual styles (outline, filled, duotone) let you match any product aesthetic. All icons are built on a 24×24 grid, use consistent 1.5px stroke weights, and are organized into a Figma component set with searchable names for fast insertion.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1609921212029-bb5a28e60960?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "2,400+ consistent vector icons in outline, filled, and duotone styles — organized and ready to export.",
+    fullDescription:
+      "IconVault gives you 2,400 vector icons across 80 categories — from interface basics to industry-specific sets like finance, healthcare, logistics, and travel. Three visual styles (outline, filled, duotone) let you match any product aesthetic. All icons are built on a 24×24 grid, use consistent 1.5px stroke weights, and are organized into a Figma component set with searchable names for fast insertion.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1609921212029-bb5a28e60960?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1609921212029-bb5a28e60960?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1558655146-d09347e92766?w=900&h=620&fit=crop&auto=format",
@@ -374,22 +609,45 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "icons-assets", subcategoryId: "vector-icons",
-    tags: ["Icons", "Vector", "SVG", "Outline", "Filled", "Duotone", "UI Icons"],
-    fileSize: "9.6 MB", formats: ["Figma", "SVG", "PDF"], screensCount: 0,
-    componentsCount: 2400, version: "v5.0.0",
-    supportsVariables: true, supportsAutoLayout: false, supportsLightDark: false,
+    categoryId: "icons-assets",
+    subcategoryId: "vector-icons",
+    tags: [
+      "Icons",
+      "Vector",
+      "SVG",
+      "Outline",
+      "Filled",
+      "Duotone",
+      "UI Icons",
+    ],
+    fileSize: "9.6 MB",
+    formats: ["Figma", "SVG", "PDF"],
+    screensCount: 0,
+    componentsCount: 2400,
+    version: "v5.0.0",
+    supportsVariables: true,
+    supportsAutoLayout: false,
+    supportsLightDark: false,
     licenseType: "commercial",
-    downloadsCount: 9840, viewsCount: 38200, rating: 4.9, reviewsCount: 573,
+    downloadsCount: 9840,
+    viewsCount: 38200,
+    rating: 4.9,
+    reviewsCount: 573,
     downloadFileUrl: `${API_BASE}/products/p7/download`,
   },
   {
-    id: "p8", slug: "device-studio-mockups",
+    id: "p8",
+    slug: "device-studio-mockups",
     title: "Device Studio 3D Mockups",
-    shortDescription: "50 premium 3D device mockups — iPhone, MacBook, iPad, iMac, and Android in realistic scenes.",
-    fullDescription: "Device Studio gives you a professional library of 50 photorealistic 3D device mockups for presenting your UI work. Includes iPhone 15 Pro, MacBook Pro, iPad Pro, iMac, Apple Watch, and Samsung Galaxy — all in multiple angles and lighting setups. Drop your screens in as linked Figma frames and they render instantly. Perfectly sized for Dribbble shots, case studies, and client presentations.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1616348436168-de43ad0db179?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "50 premium 3D device mockups — iPhone, MacBook, iPad, iMac, and Android in realistic scenes.",
+    fullDescription:
+      "Device Studio gives you a professional library of 50 photorealistic 3D device mockups for presenting your UI work. Includes iPhone 15 Pro, MacBook Pro, iPad Pro, iMac, Apple Watch, and Samsung Galaxy — all in multiple angles and lighting setups. Drop your screens in as linked Figma frames and they render instantly. Perfectly sized for Dribbble shots, case studies, and client presentations.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1616348436168-de43ad0db179?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1616348436168-de43ad0db179?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=900&h=620&fit=crop&auto=format",
@@ -398,22 +656,37 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "icons-assets", subcategoryId: "device-mockups",
+    categoryId: "icons-assets",
+    subcategoryId: "device-mockups",
     tags: ["Mockups", "3D", "iPhone", "MacBook", "Presentation", "Portfolio"],
-    fileSize: "43.2 MB", formats: ["Figma"], screensCount: 50,
-    componentsCount: 50, version: "v1.1.0",
-    supportsVariables: false, supportsAutoLayout: false, supportsLightDark: false,
+    fileSize: "43.2 MB",
+    formats: ["Figma"],
+    screensCount: 50,
+    componentsCount: 50,
+    version: "v1.1.0",
+    supportsVariables: false,
+    supportsAutoLayout: false,
+    supportsLightDark: false,
     licenseType: "commercial",
-    downloadsCount: 6130, viewsCount: 24700, rating: 4.7, reviewsCount: 298,
+    downloadsCount: 6130,
+    viewsCount: 24700,
+    rating: 4.7,
+    reviewsCount: 298,
     downloadFileUrl: `${API_BASE}/products/p8/download`,
   },
   {
-    id: "p9", slug: "shopflow-ecommerce-template",
+    id: "p9",
+    slug: "shopflow-ecommerce-template",
     title: "ShopFlow E-Commerce Template",
-    shortDescription: "Complete e-commerce Figma template — product listing, PDP, cart, checkout, account, and order tracking.",
-    fullDescription: "ShopFlow is a complete, pixel-perfect e-commerce UI template covering every customer touchpoint. From homepage hero banners to post-purchase order tracking, ShopFlow includes 80 screens across the full shopping journey. Designed to convert: product listing pages with advanced filter UX, detailed product pages with image galleries, a streamlined multi-step checkout, and a comprehensive account area for order history and returns.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "Complete e-commerce Figma template — product listing, PDP, cart, checkout, account, and order tracking.",
+    fullDescription:
+      "ShopFlow is a complete, pixel-perfect e-commerce UI template covering every customer touchpoint. From homepage hero banners to post-purchase order tracking, ShopFlow includes 80 screens across the full shopping journey. Designed to convert: product listing pages with advanced filter UX, detailed product pages with image galleries, a streamlined multi-step checkout, and a comprehensive account area for order history and returns.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&h=620&fit=crop&auto=format",
@@ -422,22 +695,37 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "templates", subcategoryId: "ecommerce",
+    categoryId: "templates",
+    subcategoryId: "ecommerce",
     tags: ["E-Commerce", "Shop", "Product Page", "Checkout", "Cart", "Retail"],
-    fileSize: "27.4 MB", formats: ["Figma"], screensCount: 80,
-    componentsCount: 195, version: "v2.3.0",
-    supportsVariables: true, supportsAutoLayout: true, supportsLightDark: true,
+    fileSize: "27.4 MB",
+    formats: ["Figma"],
+    screensCount: 80,
+    componentsCount: 195,
+    version: "v2.3.0",
+    supportsVariables: true,
+    supportsAutoLayout: true,
+    supportsLightDark: true,
     licenseType: "commercial",
-    downloadsCount: 3460, viewsCount: 13800, rating: 4.8, reviewsCount: 201,
+    downloadsCount: 3460,
+    viewsCount: 13800,
+    rating: 4.8,
+    reviewsCount: 201,
     downloadFileUrl: `${API_BASE}/products/p9/download`,
   },
   {
-    id: "p10", slug: "ux-audit-master-kit",
+    id: "p10",
+    slug: "ux-audit-master-kit",
     title: "UX Audit Master Kit",
-    shortDescription: "Free UX audit framework — heuristic checklists, severity rating matrix, and report templates.",
-    fullDescription: "The UX Audit Master Kit is a free, professional-grade audit framework that helps designers and consultants evaluate any digital product quickly and systematically. Based on Nielsen's 10 Usability Heuristics, it includes a 120-point checklist, a severity rating matrix (0–4), finding documentation cards, and a presentation-ready report template. Great for freelancers onboarding new clients or in-house teams running quarterly product health checks.",
-    price: 0, currency: "USD", isFree: true,
-    thumbnail: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&h=560&fit=crop&auto=format",
+    shortDescription:
+      "Free UX audit framework — heuristic checklists, severity rating matrix, and report templates.",
+    fullDescription:
+      "The UX Audit Master Kit is a free, professional-grade audit framework that helps designers and consultants evaluate any digital product quickly and systematically. Based on Nielsen's 10 Usability Heuristics, it includes a 120-point checklist, a severity rating matrix (0–4), finding documentation cards, and a presentation-ready report template. Great for freelancers onboarding new clients or in-house teams running quarterly product health checks.",
+    price: 0,
+    currency: "USD",
+    isFree: true,
+    thumbnail:
+      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&h=560&fit=crop&auto=format",
     galleryImages: [
       "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=900&h=620&fit=crop&auto=format",
@@ -446,13 +734,29 @@ const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=900&h=620&fit=crop&auto=format",
       "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=900&h=620&fit=crop&auto=format",
     ],
-    categoryId: "wireframes", subcategoryId: "ux-audit",
-    tags: ["UX Audit", "Heuristics", "Free", "Checklist", "Accessibility", "Report Template"],
-    fileSize: "5.3 MB", formats: ["Figma", "PDF"], screensCount: 22,
-    componentsCount: 60, version: "v1.0.0",
-    supportsVariables: false, supportsAutoLayout: true, supportsLightDark: false,
+    categoryId: "wireframes",
+    subcategoryId: "ux-audit",
+    tags: [
+      "UX Audit",
+      "Heuristics",
+      "Free",
+      "Checklist",
+      "Accessibility",
+      "Report Template",
+    ],
+    fileSize: "5.3 MB",
+    formats: ["Figma", "PDF"],
+    screensCount: 22,
+    componentsCount: 60,
+    version: "v1.0.0",
+    supportsVariables: false,
+    supportsAutoLayout: true,
+    supportsLightDark: false,
     licenseType: "personal",
-    downloadsCount: 12400, viewsCount: 48600, rating: 4.8, reviewsCount: 619,
+    downloadsCount: 12400,
+    viewsCount: 48600,
+    rating: 4.8,
+    reviewsCount: 619,
     downloadFileUrl: `${API_BASE}/products/p10/download`,
   },
 ];
@@ -477,8 +781,10 @@ function useCountUp(target: number, inView: boolean, duration = 1800) {
     const step = target / (duration / 16);
     const timer = setInterval(() => {
       start += step;
-      if (start >= target) { setCount(target); clearInterval(timer); }
-      else setCount(Math.floor(start));
+      if (start >= target) {
+        setCount(target);
+        clearInterval(timer);
+      } else setCount(Math.floor(start));
     }, 16);
     return () => clearInterval(timer);
   }, [inView, target, duration]);
@@ -494,40 +800,65 @@ function CustomCursor() {
   const ring = useRef({ x: -100, y: -100 });
 
   useEffect(() => {
-    const move = (e: MouseEvent) => { pos.current = { x: e.clientX, y: e.clientY }; };
+    const move = (e: MouseEvent) => {
+      pos.current = { x: e.clientX, y: e.clientY };
+    };
     window.addEventListener("mousemove", move);
 
     let raf: number;
     const animate = () => {
       ring.current.x += (pos.current.x - ring.current.x) * 0.12;
       ring.current.y += (pos.current.y - ring.current.y) * 0.12;
-      if (dotRef.current) dotRef.current.style.transform = `translate(${pos.current.x - 4}px, ${pos.current.y - 4}px)`;
-      if (ringRef.current) ringRef.current.style.transform = `translate(${ring.current.x - 20}px, ${ring.current.y - 20}px)`;
+      if (dotRef.current)
+        dotRef.current.style.transform = `translate(${pos.current.x - 4}px, ${
+          pos.current.y - 4
+        }px)`;
+      if (ringRef.current)
+        ringRef.current.style.transform = `translate(${
+          ring.current.x - 20
+        }px, ${ring.current.y - 20}px)`;
       raf = requestAnimationFrame(animate);
     };
     raf = requestAnimationFrame(animate);
 
-    const grow = () => { ringRef.current?.classList.add("scale-150", "opacity-50"); };
-    const shrink = () => { ringRef.current?.classList.remove("scale-150", "opacity-50"); };
-    document.querySelectorAll("a,button,[data-cursor-grow]").forEach(el => {
+    const grow = () => {
+      ringRef.current?.classList.add("scale-150", "opacity-50");
+    };
+    const shrink = () => {
+      ringRef.current?.classList.remove("scale-150", "opacity-50");
+    };
+    document.querySelectorAll("a,button,[data-cursor-grow]").forEach((el) => {
       el.addEventListener("mouseenter", grow);
       el.addEventListener("mouseleave", shrink);
     });
 
-    return () => { window.removeEventListener("mousemove", move); cancelAnimationFrame(raf); };
+    return () => {
+      window.removeEventListener("mousemove", move);
+      cancelAnimationFrame(raf);
+    };
   }, []);
 
   return (
     <>
-      <div ref={dotRef} className="fixed top-0 left-0 w-2 h-2 bg-primary rounded-full pointer-events-none z-[9999] hidden md:block transition-none" />
-      <div ref={ringRef} className="fixed top-0 left-0 w-10 h-10 border border-primary/60 rounded-full pointer-events-none z-[9998] hidden md:block transition-transform duration-150" />
+      <div
+        ref={dotRef}
+        className="fixed top-0 left-0 w-2 h-2 bg-primary rounded-full pointer-events-none z-[9999] hidden md:block transition-none"
+      />
+      <div
+        ref={ringRef}
+        className="fixed top-0 left-0 w-10 h-10 border border-primary/60 rounded-full pointer-events-none z-[9998] hidden md:block transition-transform duration-150"
+      />
     </>
   );
 }
 
 // ─── Tilt Card ────────────────────────────────────────────────────────────────
 
-function TiltCard({ children, className, onClick }: {
+function TiltCard({
+  children,
+  className,
+  onClick,
+}: {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
@@ -545,8 +876,10 @@ function TiltCard({ children, className, onClick }: {
     setTilt({ x, y });
   }, []);
 
-  const SLOW = "transform 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease";
-  const FAST = "transform 0.1s ease, box-shadow 0.5s ease, border-color 0.5s ease";
+  const SLOW =
+    "transform 0.5s ease, box-shadow 0.5s ease, border-color 0.5s ease";
+  const FAST =
+    "transform 0.1s ease, box-shadow 0.5s ease, border-color 0.5s ease";
 
   return (
     <div
@@ -555,7 +888,10 @@ function TiltCard({ children, className, onClick }: {
       onClick={onClick}
       onMouseMove={onMouseMove}
       onMouseEnter={() => setActive(true)}
-      onMouseLeave={() => { setTilt({ x: 0, y: 0 }); setActive(false); }}
+      onMouseLeave={() => {
+        setTilt({ x: 0, y: 0 });
+        setActive(false);
+      }}
       style={{
         transform: `perspective(1000px) rotateX(${tilt.y}deg) rotateY(${tilt.x}deg)`,
         transition: active ? FAST : SLOW,
@@ -576,16 +912,24 @@ interface AuthModalProps {
 }
 
 function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
-const [status, setStatus] = useState<"idle" | "loading" | "error" | "check_email" | "reset_success">("idle");
-const [errorMsg, setErrorMsg] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "error" | "check_email" | "reset_success"
+  >("idle");
+  const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const inputClass = "w-full px-5 py-3.5 pr-12 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+  const inputClass =
+    "w-full px-5 py-3.5 pr-12 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -593,28 +937,31 @@ const [errorMsg, setErrorMsg] = useState("");
     setStatus("loading");
     setErrorMsg("");
 
-if (mode === "forgot_password") {
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
-      redirectTo: window.location.origin,
-    });
+    if (mode === "forgot_password") {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(
+          form.email,
+          {
+            redirectTo: window.location.origin,
+          }
+        );
 
-    // حتى لو الإيميل مش موجود أو في rate limit، نعرض رسالة عامة
-    // ما نكشفش إذا الحساب موجود ولا لا
-    if (error && error.message.toLowerCase().includes("rate limit")) {
-      setErrorMsg("Too many requests. Please wait a bit and try again.");
-      setStatus("error");
-      return;
+        // حتى لو الإيميل مش موجود أو في rate limit، نعرض رسالة عامة
+        // ما نكشفش إذا الحساب موجود ولا لا
+        if (error && error.message.toLowerCase().includes("rate limit")) {
+          setErrorMsg("Too many requests. Please wait a bit and try again.");
+          setStatus("error");
+          return;
+        }
+
+        setStatus("reset_success");
+        return;
+      } catch (err: any) {
+        // في معظم الحالات نعرض نجاح عام
+        setStatus("reset_success");
+        return;
+      }
     }
-
-    setStatus("reset_success");
-    return;
-  } catch (err: any) {
-    // في معظم الحالات نعرض نجاح عام
-    setStatus("reset_success");
-    return;
-  }
-}
     if (mode === "register" && form.password !== form.confirmPassword) {
       setErrorMsg("Passwords do not match.");
       setStatus("error");
@@ -662,22 +1009,26 @@ if (mode === "forgot_password") {
 
         if (data.user) {
           const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, full_name')
-          .eq('id', data.user.id)
-          .maybeSingle();
-        
-        const loggedUser: AuthUser = {
-          id: data.user.id,
-          name: profile?.full_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "User",
-          email: data.user.email || form.email,
-          role: (profile?.role as "user" | "admin") || "user",
-          purchases: [],
-          wishlist: [],
-          createdAt: data.user.created_at || new Date().toISOString(),
-        };
-        onSuccess(loggedUser);
-      }
+            .from("profiles")
+            .select("role, full_name")
+            .eq("id", data.user.id)
+            .maybeSingle();
+
+          const loggedUser: AuthUser = {
+            id: data.user.id,
+            name:
+              profile?.full_name ||
+              data.user.user_metadata?.full_name ||
+              data.user.email?.split("@")[0] ||
+              "User",
+            email: data.user.email || form.email,
+            role: (profile?.role as "user" | "admin") || "user",
+            purchases: [],
+            wishlist: [],
+            createdAt: data.user.created_at || new Date().toISOString(),
+          };
+          onSuccess(loggedUser);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Something went wrong. Please try again.");
@@ -701,7 +1052,9 @@ if (mode === "forgot_password") {
     minLength?: number
   ) => (
     <div className="relative">
-      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">{label}</label>
+      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+        {label}
+      </label>
       <input
         name={name}
         type={show ? "text" : "password"}
@@ -714,7 +1067,9 @@ if (mode === "forgot_password") {
       />
       <button
         type="button"
-        aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+        aria-label={
+          show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`
+        }
         onClick={() => setShow(!show)}
         className="absolute right-3 top-[42px] flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
@@ -729,9 +1084,13 @@ if (mode === "forgot_password") {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
@@ -742,29 +1101,42 @@ if (mode === "forgot_password") {
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl"
         >
-          <button onClick={onClose} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 transition-all duration-200">
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+          >
             <X size={15} />
           </button>
 
-          <div className="text-3xl text-foreground leading-none mb-2" style={{ fontFamily: "'Cookie', cursive" }}>
+          <div
+            className="text-3xl text-foreground leading-none mb-2"
+            style={{ fontFamily: "'Cookie', cursive" }}
+          >
             Layerat<span style={{ color: "#aaff38" }}>.</span>
           </div>
-          <p className="text-xs text-muted-foreground mb-8 font-mono">Design Studio Marketplace</p>
+          <p className="text-xs text-muted-foreground mb-8 font-mono">
+            Design Studio Marketplace
+          </p>
 
           {isCheckEmail ? (
             <>
               <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <CheckCircle size={28} />
               </div>
-              <h2 className="text-xl font-display font-bold text-foreground mb-3">Check your email</h2>
+              <h2 className="text-xl font-display font-bold text-foreground mb-3">
+                Check your email
+              </h2>
               <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                We sent a confirmation link to <span className="font-semibold text-foreground">{form.email}</span>.
-                Click it to verify your account, then sign in to continue.
+                We sent a confirmation link to{" "}
+                <span className="font-semibold text-foreground">
+                  {form.email}
+                </span>
+                . Click it to verify your account, then sign in to continue.
               </p>
               <button
                 type="button"
                 onClick={() => {
-                  setForm(f => ({ ...f, password: "", confirmPassword: "" }));
+                  setForm((f) => ({ ...f, password: "", confirmPassword: "" }));
                   onSwitchMode("login");
                 }}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] transition-all duration-300"
@@ -777,14 +1149,25 @@ if (mode === "forgot_password") {
               <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Mail size={28} />
               </div>
-              <h2 className="text-xl font-display font-bold text-foreground mb-3">Check your email</h2>
+              <h2 className="text-xl font-display font-bold text-foreground mb-3">
+                Check your email
+              </h2>
               <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                We sent a password reset link to <span className="font-semibold text-foreground">{form.email}</span>.
+                We sent a password reset link to{" "}
+                <span className="font-semibold text-foreground">
+                  {form.email}
+                </span>
+                .
               </p>
               <button
                 type="button"
                 onClick={() => {
-                  setForm(f => ({ ...f, email: "", password: "", confirmPassword: "" }));
+                  setForm((f) => ({
+                    ...f,
+                    email: "",
+                    password: "",
+                    confirmPassword: "",
+                  }));
                   setStatus("idle");
                   onSwitchMode("login");
                 }}
@@ -796,28 +1179,61 @@ if (mode === "forgot_password") {
           ) : (
             <>
               <h2 className="text-xl font-display font-bold text-foreground mb-6">
-                {mode === "login" ? "Welcome back" : mode === "forgot_password" ? "Reset password" : "Create your account"}
+                {mode === "login"
+                  ? "Welcome back"
+                  : mode === "forgot_password"
+                  ? "Reset password"
+                  : "Create your account"}
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === "register" && (
                   <div>
-                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Full Name</label>
-                    <input name="name" value={form.name} onChange={handleChange} required placeholder="Your name" className={inputClass} />
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                      Full Name
+                    </label>
+                    <input
+                      name="name"
+                      value={form.name}
+                      onChange={handleChange}
+                      required
+                      placeholder="Your name"
+                      className={inputClass}
+                    />
                   </div>
                 )}
 
                 {mode !== "forgot_password" && (
                   <div>
-                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email</label>
-                    <input name="email" type="email" value={form.email} onChange={handleChange} required placeholder="you@example.com" className={inputClass} />
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                      Email
+                    </label>
+                    <input
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      required
+                      placeholder="you@example.com"
+                      className={inputClass}
+                    />
                   </div>
                 )}
 
                 {mode === "forgot_password" ? (
                   <div>
-                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email</label>
-                    <input name="email" type="email" value={form.email} onChange={handleChange} required placeholder="you@example.com" className={inputClass} />
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                      Email
+                    </label>
+                    <input
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      required
+                      placeholder="you@example.com"
+                      className={inputClass}
+                    />
                   </div>
                 ) : (
                   <>
@@ -833,16 +1249,17 @@ if (mode === "forgot_password") {
                       6
                     )}
 
-                    {mode === "register" && renderPasswordField(
-                      "confirmPassword",
-                      form.confirmPassword,
-                      handleChange,
-                      "••••••••",
-                      "Confirm Password",
-                      showConfirmPassword,
-                      setShowConfirmPassword,
-                      true
-                    )}
+                    {mode === "register" &&
+                      renderPasswordField(
+                        "confirmPassword",
+                        form.confirmPassword,
+                        handleChange,
+                        "••••••••",
+                        "Confirm Password",
+                        showConfirmPassword,
+                        setShowConfirmPassword,
+                        true
+                      )}
                   </>
                 )}
 
@@ -868,19 +1285,38 @@ if (mode === "forgot_password") {
                 {mode === "register" && (
                   <p className="text-[11px] text-muted-foreground/70 leading-relaxed text-center">
                     By creating an account, you agree to our{" "}
-                    <button type="button" onClick={() => {}} className="text-primary hover:underline font-medium">Terms of Use</button>
-                    {" "}and{" "}
-                    <button type="button" onClick={() => {}} className="text-primary hover:underline font-medium">Privacy Policy</button>.
+                    <button
+                      type="button"
+                      onClick={() => {}}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Terms of Use
+                    </button>{" "}
+                    and{" "}
+                    <button
+                      type="button"
+                      onClick={() => {}}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Privacy Policy
+                    </button>
+                    .
                   </p>
                 )}
-                {(status as string) === "reset_success" && mode === "forgot_password" && (
-                  <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                    If an account exists with this email, you will receive a password reset link shortly.
-                  </p>
-                )}
-                
+                {(status as string) === "reset_success" &&
+                  mode === "forgot_password" && (
+                    <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                      If an account exists with this email, you will receive a
+                      password reset link shortly.
+                    </p>
+                  )}
+
                 {mode === "forgot_password" ? (
-                  <button type="submit" disabled={status === "loading"} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2">
+                  <button
+                    type="submit"
+                    disabled={status === "loading"}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2"
+                  >
                     {status === "loading" ? (
                       <span className="flex items-center gap-2">
                         <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
@@ -891,27 +1327,50 @@ if (mode === "forgot_password") {
                     )}
                   </button>
                 ) : (
-                  
-                  <button type="submit" disabled={status === "loading"} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2">
+                  <button
+                    type="submit"
+                    disabled={status === "loading"}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2"
+                  >
                     {status === "loading" ? (
                       <span className="flex items-center gap-2">
                         <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                        {mode === "login" ? "Signing in..." : "Creating account..."}
+                        {mode === "login"
+                          ? "Signing in..."
+                          : "Creating account..."}
                       </span>
+                    ) : mode === "login" ? (
+                      "Sign In"
                     ) : (
-                      mode === "login" ? "Sign In" : "Create Account"
+                      "Create Account"
                     )}
                   </button>
                 )}
               </form>
 
               <p className="text-center text-sm text-muted-foreground mt-6">
-                {mode === "login" ? "New to Layerat?" : mode === "register" ? "Already have an account?" : "Remembered your password?"}{" "}
+                {mode === "login"
+                  ? "New to Layerat?"
+                  : mode === "register"
+                  ? "Already have an account?"
+                  : "Remembered your password?"}{" "}
                 <button
-                  onClick={() => onSwitchMode(mode === "login" ? "register" : mode === "register" ? "login" : "login")}
+                  onClick={() =>
+                    onSwitchMode(
+                      mode === "login"
+                        ? "register"
+                        : mode === "register"
+                        ? "login"
+                        : "login"
+                    )
+                  }
                   className="text-primary font-semibold hover:underline"
                 >
-                  {mode === "login" ? "Create account" : mode === "register" ? "Sign in" : "Back to sign in"}
+                  {mode === "login"
+                    ? "Create account"
+                    : mode === "register"
+                    ? "Sign in"
+                    : "Back to sign in"}
                 </button>
               </p>
             </>
@@ -973,7 +1432,10 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
 
   const handleDismiss = () => {
     setVisible(false);
-    localStorage.setItem(GIFT_KEY, JSON.stringify({ ts: Date.now(), action: "dismissed" }));
+    localStorage.setItem(
+      GIFT_KEY,
+      JSON.stringify({ ts: Date.now(), action: "dismissed" })
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -994,7 +1456,7 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
        *   2. Add GIFT_CONFIG.productId to user.purchases
        *   3. Return a signed, time-limited downloadUrl for the gift file
        */
-      await new Promise(r => setTimeout(r, 1100));
+      await new Promise((r) => setTimeout(r, 1100));
 
       const giftUser: AuthUser = {
         id: `u_${Date.now()}`,
@@ -1008,7 +1470,10 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
 
       localStorage.setItem("ld_token", "simulated_token_gift");
       localStorage.setItem("ld_user", JSON.stringify(giftUser));
-      localStorage.setItem(GIFT_KEY, JSON.stringify({ ts: Date.now(), action: "claimed" }));
+      localStorage.setItem(
+        GIFT_KEY,
+        JSON.stringify({ ts: Date.now(), action: "claimed" })
+      );
 
       onSuccess(giftUser);
       setStep("success");
@@ -1028,7 +1493,8 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
     }
   };
 
-  const inputCls = "w-full px-4 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+  const inputCls =
+    "w-full px-4 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
 
   return (
     <AnimatePresence>
@@ -1040,7 +1506,9 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
           className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) handleDismiss(); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleDismiss();
+          }}
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
@@ -1064,7 +1532,9 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
               <div className="absolute bottom-5 left-5">
                 <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md border border-white/15 rounded-full px-4 py-2">
                   <span className="text-base">🎁</span>
-                  <span className="text-[11px] font-bold text-white tracking-widest uppercase">Free Gift</span>
+                  <span className="text-[11px] font-bold text-white tracking-widest uppercase">
+                    Free Gift
+                  </span>
                 </div>
               </div>
             </div>
@@ -1085,16 +1555,23 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
                   {/* Header */}
                   <div className="mb-7">
                     <h2 className="text-2xl font-display font-bold text-foreground leading-snug mb-3">
-                      There's a free gift<br />waiting for you!
+                      There's a free gift
+                      <br />
+                      waiting for you!
                     </h2>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       Register with your email and get{" "}
-                      <span className="font-semibold text-foreground">{GIFT_CONFIG.title}</span>{" "}
+                      <span className="font-semibold text-foreground">
+                        {GIFT_CONFIG.title}
+                      </span>{" "}
                       added to your library instantly — no credit card needed.
                     </p>
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {GIFT_CONFIG.description.split(" · ").map(tag => (
-                        <span key={tag} className="text-[11px] text-primary font-medium bg-primary/8 border border-primary/15 px-2.5 py-1 rounded-full">
+                      {GIFT_CONFIG.description.split(" · ").map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[11px] text-primary font-medium bg-primary/8 border border-primary/15 px-2.5 py-1 rounded-full"
+                        >
                           {tag}
                         </span>
                       ))}
@@ -1102,25 +1579,32 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
                   </div>
 
                   {/* Form */}
-                  <form onSubmit={handleSubmit} className="flex flex-col gap-3 flex-1">
+                  <form
+                    onSubmit={handleSubmit}
+                    className="flex flex-col gap-3 flex-1"
+                  >
                     <div>
-                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5">Name</label>
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5">
+                        Name
+                      </label>
                       <input
                         type="text"
                         placeholder="Your name (optional)"
                         value={name}
-                        onChange={e => setName(e.target.value)}
+                        onChange={(e) => setName(e.target.value)}
                         className={inputCls}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5">Email</label>
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5">
+                        Email
+                      </label>
                       <input
                         type="email"
                         required
                         placeholder="your@email.com"
                         value={email}
-                        onChange={e => setEmail(e.target.value)}
+                        onChange={(e) => setEmail(e.target.value)}
                         className={inputCls}
                       />
                     </div>
@@ -1164,9 +1648,15 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
                   >
                     <CheckCircle size={32} className="text-accent" />
                   </motion.div>
-                  <h2 className="text-2xl font-display font-bold text-foreground mb-2">You're all set! 🎉</h2>
-                  <p className="text-sm text-muted-foreground mb-1">Your download has started automatically.</p>
-                  <p className="text-xs text-muted-foreground/60">The kit has been added to your library.</p>
+                  <h2 className="text-2xl font-display font-bold text-foreground mb-2">
+                    You're all set! 🎉
+                  </h2>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Your download has started automatically.
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    The kit has been added to your library.
+                  </p>
                   <div className="mt-7 flex items-center justify-center gap-2 text-xs text-muted-foreground/40">
                     <div className="w-3 h-3 border-2 border-muted-foreground/25 border-t-muted-foreground/60 rounded-full animate-spin" />
                     Closing in a moment…
@@ -1198,7 +1688,20 @@ interface NavbarProps {
   activeCategoryId: string | null;
 }
 
-function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLogout, onSearch, wishlistCount, categories, onCategoryClick, activeCategoryId }: NavbarProps) {
+function Navbar({
+  isDark,
+  onToggle,
+  page,
+  onNavigate,
+  authUser,
+  onAuthOpen,
+  onLogout,
+  onSearch,
+  wishlistCount,
+  categories,
+  onCategoryClick,
+  activeCategoryId,
+}: NavbarProps) {
   const scrollY = useScrollY();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1217,74 +1720,111 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
 
   // Initials fallback for user avatar
   const initials = authUser
-    ? authUser.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
+    ? authUser.name
+        .split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
     : "";
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${solid ? "bg-background/90 backdrop-blur-xl border-b border-border" : ""}`}>
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        solid ? "bg-background/90 backdrop-blur-xl border-b border-border" : ""
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 lg:px-10 flex items-center justify-between h-16 lg:h-20 gap-4">
-
         {/* Logo */}
-        <button onClick={() => { onNavigate("home"); setMenuOpen(false); }}
+        <button
+          onClick={() => {
+            onNavigate("home");
+            setMenuOpen(false);
+          }}
           className="shrink-0 text-4xl text-foreground hover:opacity-80 transition-opacity leading-none"
-          style={{ fontFamily: "'Cookie', cursive" }}>
+          style={{ fontFamily: "'Cookie', cursive" }}
+        >
           Layerat<span style={{ color: "#aaff38" }}>.</span>
         </button>
 
         {/* Desktop center nav */}
         <div className="hidden md:flex items-center gap-2 ml-8">
-          <button onClick={() => onNavigate("home")}
-            className={`text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group ${page === "home" ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}>
+          <button
+            onClick={() => onNavigate("home")}
+            className={`text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group ${
+              page === "home"
+                ? "text-primary font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
             Home
             <span className="absolute -bottom-0.5 left-3 right-3 h-px bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
           </button>
 
-          {categories.map(cat => {
-  const isActive = activeCategoryId === cat.id;
-  return (
-    <button
-      key={cat.id}
-      onClick={() => onCategoryClick(cat.id)}
-      className={`text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group ${
-        isActive ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {cat.name}
-      <span className={`absolute -bottom-0.5 left-3 right-3 h-px bg-primary transition-transform duration-300 ${
-        isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-      }`} />
-    </button>
-  );
-})}
-
+          {categories.map((cat) => {
+            const isActive = activeCategoryId === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => onCategoryClick(cat.id)}
+                className={`text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5 relative group ${
+                  isActive
+                    ? "text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {cat.name}
+                <span
+                  className={`absolute -bottom-0.5 left-3 right-3 h-px bg-primary transition-transform duration-300 ${
+                    isActive
+                      ? "scale-x-100"
+                      : "scale-x-0 group-hover:scale-x-100"
+                  }`}
+                />
+              </button>
+            );
+          })}
         </div>
 
         {/* Right actions */}
         <div className="flex items-center gap-2 shrink-0">
-
           {/* Search toggle (desktop) */}
           <div className="hidden md:block relative">
             <AnimatePresence>
               {searchOpen ? (
                 <motion.div
-                  initial={{ width: 0, opacity: 0 }} animate={{ width: 260, opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }} transition={{ duration: 0.3 }}
-                  className="flex items-center overflow-hidden">
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 260, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center overflow-hidden"
+                >
                   <div className="flex items-center border border-border rounded-xl bg-card overflow-hidden w-full">
-                    <Search size={14} className="ml-3 text-muted-foreground shrink-0" />
-                    <input autoFocus value={searchVal} onChange={e => setSearchVal(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && handleSearch()}
+                    <Search
+                      size={14}
+                      className="ml-3 text-muted-foreground shrink-0"
+                    />
+                    <input
+                      autoFocus
+                      value={searchVal}
+                      onChange={(e) => setSearchVal(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                       placeholder="Search resources..."
-                      className="flex-1 px-3 py-2 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />
-                    <button onClick={() => setSearchOpen(false)}
-                      className="mr-2 p-1 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors">
+                      className="flex-1 px-3 py-2 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => setSearchOpen(false)}
+                      className="mr-2 p-1 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors"
+                    >
                       <X size={13} />
                     </button>
                   </div>
                 </motion.div>
               ) : (
-                <button onClick={() => setSearchOpen(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card hover:border-primary/50 hover:bg-primary/10 transition-all duration-300">
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card hover:border-primary/50 hover:bg-primary/10 transition-all duration-300"
+                >
                   <Search size={16} className="text-muted-foreground" />
                 </button>
               )}
@@ -1292,9 +1832,22 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
           </div>
 
           {/* Favorites */}
-          <button onClick={() => onNavigate("favorites")}
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300 ${page === "favorites" ? "border-primary/50 bg-primary/10" : "border-border bg-card hover:border-primary/50 hover:bg-primary/10"}`}>
-            <Heart size={16} className={page === "favorites" ? "text-primary fill-current" : "text-muted-foreground"} />
+          <button
+            onClick={() => onNavigate("favorites")}
+            className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300 ${
+              page === "favorites"
+                ? "border-primary/50 bg-primary/10"
+                : "border-border bg-card hover:border-primary/50 hover:bg-primary/10"
+            }`}
+          >
+            <Heart
+              size={16}
+              className={
+                page === "favorites"
+                  ? "text-primary fill-current"
+                  : "text-muted-foreground"
+              }
+            />
             {wishlistCount > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center leading-none">
                 {wishlistCount > 9 ? "9+" : wishlistCount}
@@ -1303,21 +1856,36 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
           </button>
 
           {/* Theme toggle */}
-          <button onClick={onToggle}
-            className="w-9 h-9 rounded-full flex items-center justify-center border border-border bg-card hover:border-primary/50 hover:bg-primary/10 transition-all duration-300">
-            {isDark ? <Sun size={16} className="text-primary" /> : <Moon size={16} className="text-foreground" />}
+          <button
+            onClick={onToggle}
+            className="w-9 h-9 rounded-full flex items-center justify-center border border-border bg-card hover:border-primary/50 hover:bg-primary/10 transition-all duration-300"
+          >
+            {isDark ? (
+              <Sun size={16} className="text-primary" />
+            ) : (
+              <Moon size={16} className="text-foreground" />
+            )}
           </button>
 
           {/* Auth / User */}
           {authUser ? (
             <div className="relative hidden md:block">
-              <button onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/40 transition-all duration-200">
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/40 transition-all duration-200"
+              >
                 <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">
                   {initials}
                 </div>
-                <span className="text-sm font-medium text-foreground max-w-[80px] truncate">{authUser.name.split(" ")[0]}</span>
-                <ChevronDown size={13} className={`text-muted-foreground transition-transform ${profileOpen ? "rotate-180" : ""}`} />
+                <span className="text-sm font-medium text-foreground max-w-[80px] truncate">
+                  {authUser.name.split(" ")[0]}
+                </span>
+                <ChevronDown
+                  size={13}
+                  className={`text-muted-foreground transition-transform ${
+                    profileOpen ? "rotate-180" : ""
+                  }`}
+                />
               </button>
 
               <AnimatePresence>
@@ -1327,25 +1895,59 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 4, scale: 0.97 }}
                     transition={{ duration: 0.18 }}
-                    className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-50">
+                    className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-50"
+                  >
                     <div className="px-4 py-3 border-b border-border">
-                      <p className="text-sm font-semibold text-foreground truncate">{authUser.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{authUser.email}</p>
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {authUser.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {authUser.email}
+                      </p>
                     </div>
                     {[
-                      { icon: User, label: "Profile", action: () => { onNavigate("profile"); setProfileOpen(false); } },
-                      { icon: Package, label: "My Library", action: () => { onNavigate("profile"); setProfileOpen(false); } },
-                      { icon: Settings, label: "Settings", action: () => { onNavigate("profile"); setProfileOpen(false); } },
+                      {
+                        icon: User,
+                        label: "Profile",
+                        action: () => {
+                          onNavigate("profile");
+                          setProfileOpen(false);
+                        },
+                      },
+                      {
+                        icon: Package,
+                        label: "My Library",
+                        action: () => {
+                          onNavigate("profile");
+                          setProfileOpen(false);
+                        },
+                      },
+                      {
+                        icon: Settings,
+                        label: "Settings",
+                        action: () => {
+                          onNavigate("profile");
+                          setProfileOpen(false);
+                        },
+                      },
                     ].map(({ icon: Icon, label, action }) => (
-                      <button key={label} onClick={action}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors">
+                      <button
+                        key={label}
+                        onClick={action}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors"
+                      >
                         <Icon size={14} />
                         {label}
                       </button>
                     ))}
                     <div className="border-t border-border">
-                      <button onClick={() => { onLogout(); setProfileOpen(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors">
+                      <button
+                        onClick={() => {
+                          onLogout();
+                          setProfileOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors"
+                      >
                         <LogOut size={14} />
                         Sign Out
                       </button>
@@ -1356,19 +1958,26 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
             </div>
           ) : (
             <div className="hidden md:flex items-center gap-2">
-              <button onClick={() => onAuthOpen("login")}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-full border border-border hover:border-primary/30 hover:bg-primary/5">
+              <button
+                onClick={() => onAuthOpen("login")}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-full border border-border hover:border-primary/30 hover:bg-primary/5"
+              >
                 Sign In
               </button>
-              <button onClick={() => onAuthOpen("register")}
-                className="text-sm font-semibold px-4 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+              <button
+                onClick={() => onAuthOpen("register")}
+                className="text-sm font-semibold px-4 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              >
                 Get Started
               </button>
             </div>
           )}
 
           {/* Mobile menu toggle */}
-          <button className="md:hidden w-9 h-9 flex items-center justify-center" onClick={() => setMenuOpen(!menuOpen)}>
+          <button
+            className="md:hidden w-9 h-9 flex items-center justify-center"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
@@ -1377,30 +1986,46 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
       {/* Mobile menu */}
       <AnimatePresence>
         {menuOpen && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-            className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border px-5 pb-6">
-
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border px-5 pb-6"
+          >
             {/* Mobile search */}
             <div className="py-4 border-b border-border/50">
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border bg-card">
                 <Search size={16} className="text-muted-foreground shrink-0" />
-                <input value={searchVal} onChange={e => setSearchVal(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSearch()}
+                <input
+                  value={searchVal}
+                  onChange={(e) => setSearchVal(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   placeholder="Search resources..."
-                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />
+                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                />
               </div>
             </div>
 
             {/* Home + Categories */}
-            <button onClick={() => { onNavigate("home"); setMenuOpen(false); }}
-              className="flex items-center gap-3 w-full text-left py-3 text-base font-medium text-foreground border-b border-border/30 transition-colors">
+            <button
+              onClick={() => {
+                onNavigate("home");
+                setMenuOpen(false);
+              }}
+              className="flex items-center gap-3 w-full text-left py-3 text-base font-medium text-foreground border-b border-border/30 transition-colors"
+            >
               <Layout size={16} className="text-primary" />
               Home
             </button>
-            {categories.map(cat => (
-              <button key={cat.id}
-                onClick={() => { onNavigate("browse"); setMenuOpen(false); }}
-                className="flex items-center gap-3 w-full text-left py-3 text-base text-muted-foreground hover:text-foreground border-b border-border/30 last:border-0 transition-colors">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => {
+                  onNavigate("browse");
+                  setMenuOpen(false);
+                }}
+                className="flex items-center gap-3 w-full text-left py-3 text-base text-muted-foreground hover:text-foreground border-b border-border/30 last:border-0 transition-colors"
+              >
                 <cat.icon size={16} style={{ color: cat.color }} />
                 {cat.name}
               </button>
@@ -1409,38 +2034,70 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
             {/* Auth buttons */}
             {authUser ? (
               <div className="mt-4 space-y-2">
-                <button onClick={() => { onNavigate("favorites"); setMenuOpen(false); }}
-                  className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:border-primary/40 transition-colors">
+                <button
+                  onClick={() => {
+                    onNavigate("favorites");
+                    setMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:border-primary/40 transition-colors"
+                >
                   <Heart size={15} />
                   My Favorites
-                  {wishlistCount > 0 && <span className="ml-auto text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">{wishlistCount}</span>}
+                  {wishlistCount > 0 && (
+                    <span className="ml-auto text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                      {wishlistCount}
+                    </span>
+                  )}
                 </button>
-                <button onClick={() => { onNavigate("profile"); setMenuOpen(false); }}
-                  className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:border-primary/40 transition-colors">
+                <button
+                  onClick={() => {
+                    onNavigate("profile");
+                    setMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:border-primary/40 transition-colors"
+                >
                   <User size={15} /> My Profile
                 </button>
-                <button onClick={() => { onLogout(); setMenuOpen(false); }}
-                  className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <button
+                  onClick={() => {
+                    onLogout();
+                    setMenuOpen(false);
+                  }}
+                  className="w-full py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Sign Out
                 </button>
                 {authUser?.role === "admin" && (
-  <button
-    onClick={() => { onNavigate("admin"); setProfileOpen(false); }}
-    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 rounded-xl"
-  >
-    <Settings size={15} />
-    Admin Dashboard
-  </button>
-)}
+                  <button
+                    onClick={() => {
+                      onNavigate("admin");
+                      setProfileOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted/50 rounded-xl"
+                  >
+                    <Settings size={15} />
+                    Admin Dashboard
+                  </button>
+                )}
               </div>
             ) : (
               <div className="mt-4 space-y-2">
-                <button onClick={() => { onAuthOpen("register"); setMenuOpen(false); }}
-                  className="w-full py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity text-sm">
+                <button
+                  onClick={() => {
+                    onAuthOpen("register");
+                    setMenuOpen(false);
+                  }}
+                  className="w-full py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity text-sm"
+                >
                   Get Started — It's Free
                 </button>
-                <button onClick={() => { onAuthOpen("login"); setMenuOpen(false); }}
-                  className="w-full py-3 rounded-full border border-border text-foreground font-medium text-sm hover:border-primary/40 transition-colors">
+                <button
+                  onClick={() => {
+                    onAuthOpen("login");
+                    setMenuOpen(false);
+                  }}
+                  className="w-full py-3 rounded-full border border-border text-foreground font-medium text-sm hover:border-primary/40 transition-colors"
+                >
                   Sign In
                 </button>
               </div>
@@ -1454,7 +2111,11 @@ function Navbar({ isDark, onToggle, page, onNavigate, authUser, onAuthOpen, onLo
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-function Hero({ onSearch, onNavigate, onAuthOpen }: {
+function Hero({
+  onSearch,
+  onNavigate,
+  onAuthOpen,
+}: {
   onSearch: (q: string) => void;
   onNavigate: (p: Page) => void;
   onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
@@ -1465,10 +2126,19 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
     if (searchQuery.trim()) onSearch(searchQuery.trim());
   };
 
-  const quickCategories = ["UI Kits", "Landing Pages", "Wireframes", "Icons", "Design Systems"];
+  const quickCategories = [
+    "UI Kits",
+    "Landing Pages",
+    "Wireframes",
+    "Icons",
+    "Design Systems",
+  ];
 
   return (
-    <section id="hero" className="relative min-h-screen flex items-center overflow-hidden pt-20">
+    <section
+      id="hero"
+      className="relative min-h-screen flex items-center overflow-hidden pt-20"
+    >
       {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[900px] h-[700px] rounded-full blur-[140px] bg-[#aaff38]/5 dark:bg-[#aaff38]/6" />
@@ -1477,15 +2147,25 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
       </div>
 
       {/* Grid pattern */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{ backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10 w-full py-20">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-6 items-center">
           <div>
             {/* Badge */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8"
+            >
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               500+ Premium Figma Resources
             </motion.div>
@@ -1494,42 +2174,71 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
             {["The Design", "Resource", "Marketplace."].map((word, i) => (
               <div key={word} className="overflow-hidden">
                 <motion.h1
-                  initial={{ y: 100 }} animate={{ y: 0 }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.1 * i }}
-                  className={`text-6xl md:text-7xl lg:text-8xl font-display font-extrabold leading-[0.9] tracking-tight mb-1 ${i === 1 ? "text-primary" : "text-foreground"}`}>
+                  initial={{ y: 100 }}
+                  animate={{ y: 0 }}
+                  transition={{
+                    duration: 0.8,
+                    ease: [0.16, 1, 0.3, 1],
+                    delay: 0.1 * i,
+                  }}
+                  className={`text-6xl md:text-7xl lg:text-8xl font-display font-extrabold leading-[0.9] tracking-tight mb-1 ${
+                    i === 1 ? "text-primary" : "text-foreground"
+                  }`}
+                >
                   {word}
                 </motion.h1>
               </div>
             ))}
 
-            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.45 }}
-              className="text-muted-foreground text-lg max-w-lg leading-relaxed mt-6 mb-8">
-              Premium UI kits, templates, design systems, and Figma resources — built by designers, for designers.
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45 }}
+              className="text-muted-foreground text-lg max-w-lg leading-relaxed mt-6 mb-8"
+            >
+              Premium UI kits, templates, design systems, and Figma resources —
+              built by designers, for designers.
             </motion.p>
 
             {/* Search Bar */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.55 }}
-              className="relative max-w-lg">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.55 }}
+              className="relative max-w-lg"
+            >
               <div className="flex items-center bg-card border border-border rounded-2xl shadow-xl hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-200">
-                <Search size={18} className="ml-5 text-muted-foreground shrink-0" />
+                <Search
+                  size={18}
+                  className="ml-5 text-muted-foreground shrink-0"
+                />
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSearch()}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   placeholder="Search UI kits, templates, icons..."
-                  className="flex-1 px-4 py-4 bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none text-base" />
-                <button onClick={handleSearch}
-                  className="mr-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shrink-0">
+                  className="flex-1 px-4 py-4 bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none text-base"
+                />
+                <button
+                  onClick={handleSearch}
+                  className="mr-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shrink-0"
+                >
                   Search
                 </button>
               </div>
 
               {/* Quick category pills */}
               <div className="flex flex-wrap gap-2 mt-3">
-                {quickCategories.map(cat => (
-                  <button key={cat} onClick={() => { setSearchQuery(cat); onSearch(cat); }}
-                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all duration-200">
+                {quickCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setSearchQuery(cat);
+                      onSearch(cat);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all duration-200"
+                  >
                     {cat}
                   </button>
                 ))}
@@ -1537,15 +2246,26 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
             </motion.div>
 
             {/* CTA row */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.65 }}
-              className="flex flex-wrap gap-4 mt-8">
-              <button onClick={() => onNavigate("browse")}
-                className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.65 }}
+              className="flex flex-wrap gap-4 mt-8"
+            >
+              <button
+                onClick={() => onNavigate("browse")}
+                className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300"
+              >
                 Browse All Resources
-                <ArrowUpRight size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                <ArrowUpRight
+                  size={18}
+                  className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+                />
               </button>
-              <button onClick={() => onAuthOpen("register")}
-                className="group flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300">
+              <button
+                onClick={() => onAuthOpen("register")}
+                className="group flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+              >
                 Join Free
                 <Users size={16} />
               </button>
@@ -1553,8 +2273,12 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
           </div>
 
           {/* Right: Floating product preview cards */}
-          <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.9, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex justify-center lg:justify-end">
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.9, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative flex justify-center lg:justify-end"
+          >
             <div className="relative">
               {/* Main preview card */}
               <div className="w-64 h-64 lg:w-80 lg:h-80 rounded-3xl bg-gradient-to-br from-primary/20 via-card to-muted border border-primary/20 overflow-hidden relative">
@@ -1567,32 +2291,67 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-card to-transparent" />
                 <div className="absolute bottom-4 left-4 right-4">
-                  <p className="text-xs font-mono text-primary mb-1">FEATURED</p>
-                  <p className="text-sm font-display font-bold text-foreground">Orbit SaaS UI Kit</p>
+                  <p className="text-xs font-mono text-primary mb-1">
+                    FEATURED
+                  </p>
+                  <p className="text-sm font-display font-bold text-foreground">
+                    Orbit SaaS UI Kit
+                  </p>
                 </div>
               </div>
 
               {/* Floating stat badges */}
-              <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-6 -left-8 bg-card border border-border rounded-2xl px-4 py-3 shadow-xl">
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute -top-6 -left-8 bg-card border border-border rounded-2xl px-4 py-3 shadow-xl"
+              >
                 <div className="flex items-center gap-2">
                   <Star size={13} className="text-primary fill-primary" />
-                  <span className="text-sm font-mono font-semibold text-foreground">4.9 Rating</span>
+                  <span className="text-sm font-mono font-semibold text-foreground">
+                    4.9 Rating
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Community verified</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Community verified
+                </p>
               </motion.div>
 
-              <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute -bottom-6 -right-8 bg-card border border-border rounded-2xl px-4 py-3 shadow-xl">
+              <motion.div
+                animate={{ y: [0, 8, 0] }}
+                transition={{
+                  duration: 3.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.5,
+                }}
+                className="absolute -bottom-6 -right-8 bg-card border border-border rounded-2xl px-4 py-3 shadow-xl"
+              >
                 <div className="flex items-center gap-2">
                   <Download size={13} className="text-primary" />
-                  <span className="text-sm font-mono font-semibold text-foreground">50K+</span>
+                  <span className="text-sm font-mono font-semibold text-foreground">
+                    50K+
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Total downloads</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Total downloads
+                </p>
               </motion.div>
 
-              <motion.div animate={{ y: [0, -6, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                className="absolute top-1/2 -right-14 -translate-y-1/2 bg-primary text-primary-foreground rounded-2xl px-4 py-3 shadow-xl">
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 1,
+                }}
+                className="absolute top-1/2 -right-14 -translate-y-1/2 bg-primary text-primary-foreground rounded-2xl px-4 py-3 shadow-xl"
+              >
                 <div className="text-sm font-mono font-bold">500+</div>
                 <div className="text-xs opacity-80">Resources</div>
               </motion.div>
@@ -1601,13 +2360,22 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
         </div>
 
         {/* Scroll indicator */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-          <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-5 h-8 rounded-full border border-muted-foreground/40 flex items-start justify-center pt-1.5">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+        >
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="w-5 h-8 rounded-full border border-muted-foreground/40 flex items-start justify-center pt-1.5"
+          >
             <div className="w-1 h-2 rounded-full bg-primary" />
           </motion.div>
-          <span className="text-xs text-muted-foreground font-mono">scroll</span>
+          <span className="text-xs text-muted-foreground font-mono">
+            scroll
+          </span>
         </motion.div>
       </div>
     </section>
@@ -1616,17 +2384,40 @@ function Hero({ onSearch, onNavigate, onAuthOpen }: {
 
 // ─── Marketplace Stats ────────────────────────────────────────────────────────
 
-interface StatDef { value: number; suffix: string; prefix?: string; label: string; icon: React.ElementType; delay: number; }
+interface StatDef {
+  value: number;
+  suffix: string;
+  prefix?: string;
+  label: string;
+  icon: React.ElementType;
+  delay: number;
+}
 
-function StatItem({ value, suffix, prefix, label, icon: Icon, inView, delay }: StatDef & { inView: boolean }) {
+function StatItem({
+  value,
+  suffix,
+  prefix,
+  label,
+  icon: Icon,
+  inView,
+  delay,
+}: StatDef & { inView: boolean }) {
   const count = useCountUp(value, inView, 1600 + delay * 100);
   return (
-    <motion.div initial={{ opacity: 0, y: 30 }} animate={inView ? { opacity: 1, y: 0 } : {}}
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.6, delay: delay * 0.1 }}
-      className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-primary/5 transition-colors duration-300 group">
-      <Icon size={20} className="text-primary mb-3 group-hover:scale-110 transition-transform" />
+      className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-primary/5 transition-colors duration-300 group"
+    >
+      <Icon
+        size={20}
+        className="text-primary mb-3 group-hover:scale-110 transition-transform"
+      />
       <div className="text-4xl lg:text-5xl font-display font-black text-foreground mb-1">
-        {prefix}{count}{suffix}
+        {prefix}
+        {count}
+        {suffix}
       </div>
       <div className="text-sm text-muted-foreground font-medium">{label}</div>
     </motion.div>
@@ -1637,16 +2428,42 @@ function StatsSection() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-100px" });
   const stats: StatDef[] = [
-    { value: 500, suffix: "+", label: "Design Resources", icon: Package, delay: 0 },
-    { value: 50, suffix: "K+", label: "Total Downloads", icon: Download, delay: 1 },
-    { value: 12, suffix: "K+", label: "Active Designers", icon: Users, delay: 2 },
-    { value: 98, suffix: "%", label: "Satisfaction Rate", icon: Award, delay: 3 },
+    {
+      value: 500,
+      suffix: "+",
+      label: "Design Resources",
+      icon: Package,
+      delay: 0,
+    },
+    {
+      value: 50,
+      suffix: "K+",
+      label: "Total Downloads",
+      icon: Download,
+      delay: 1,
+    },
+    {
+      value: 12,
+      suffix: "K+",
+      label: "Active Designers",
+      icon: Users,
+      delay: 2,
+    },
+    {
+      value: 98,
+      suffix: "%",
+      label: "Satisfaction Rate",
+      icon: Award,
+      delay: 3,
+    },
   ];
   return (
     <section ref={ref} className="py-20 border-y border-border">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-4">
-          {stats.map(s => <StatItem key={s.label} {...s} inView={inView} />)}
+          {stats.map((s) => (
+            <StatItem key={s.label} {...s} inView={inView} />
+          ))}
         </div>
       </div>
       {/* Sentinel: gift popup watches this to know user scrolled past section 2 */}
@@ -1657,66 +2474,113 @@ function StatsSection() {
 
 // ─── Categories Section ───────────────────────────────────────────────────────
 
-function CategoriesSection({ onCategoryClick, categories }: { onCategoryClick: (cat: Category) => void; categories: Category[] }) {
+function CategoriesSection({
+  onCategoryClick,
+  categories,
+}: {
+  onCategoryClick: (cat: Category) => void;
+  categories: Category[];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
     <section id="categories" ref={ref} className="py-24 lg:py-32 bg-muted/20">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5 }}
-          className="text-center mb-16">
-          <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">Browse By Category</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
+          <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+            Browse By Category
+          </span>
           <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
             What are you building?
           </h2>
           <p className="mt-4 text-muted-foreground max-w-lg mx-auto">
-            Every resource is crafted by professional UX/UI designers and organized for fast discovery.
+            Every resource is crafted by professional UX/UI designers and
+            organized for fast discovery.
           </p>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {categories.map((cat, i) => (
-            <motion.button key={cat.id}
-              initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
+            <motion.button
+              key={cat.id}
+              initial={{ opacity: 0, y: 40 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.1 }}
               onClick={() => onCategoryClick(cat)}
-              className="group p-6 rounded-3xl border border-border bg-card text-left hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_60px_rgba(170,255,56,0.06)] transition-all duration-500 relative overflow-hidden">
+              className="group p-6 rounded-3xl border border-border bg-card text-left hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_60px_rgba(170,255,56,0.06)] transition-all duration-500 relative overflow-hidden"
+            >
               {/* Glow bg */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: `radial-gradient(ellipse at top left, ${cat.color}08 0%, transparent 70%)` }} />
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                style={{
+                  background: `radial-gradient(ellipse at top left, ${cat.color}08 0%, transparent 70%)`,
+                }}
+              />
 
               <div className="relative">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300"
-                  style={{ background: `${cat.color}18`, border: `1px solid ${cat.color}30` }}>
-                  <cat.icon size={22} style={{ color: cat.color }} className="group-hover:scale-110 transition-transform duration-300" />
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300"
+                  style={{
+                    background: `${cat.color}18`,
+                    border: `1px solid ${cat.color}30`,
+                  }}
+                >
+                  <cat.icon
+                    size={22}
+                    style={{ color: cat.color }}
+                    className="group-hover:scale-110 transition-transform duration-300"
+                  />
                 </div>
 
-                <h3 className="text-lg font-display font-bold text-foreground mb-2">{cat.name}</h3>
+                <h3 className="text-lg font-display font-bold text-foreground mb-2">
+                  {cat.name}
+                </h3>
                 <p className="text-xs text-muted-foreground mb-4">
                   {cat.subcategories.length} subcategories
                 </p>
 
                 <div className="space-y-1">
-                  {cat.subcategories.slice(0, 3).map(sub => (
-                    <div key={sub.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {cat.subcategories.slice(0, 3).map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
                       <span className="w-1 h-1 rounded-full bg-muted-foreground shrink-0" />
                       {sub.name}
                     </div>
                   ))}
                   {cat.subcategories.length > 3 && (
-                    <div className="text-xs text-primary font-mono">+{cat.subcategories.length - 3} more</div>
+                    <div className="text-xs text-primary font-mono">
+                      +{cat.subcategories.length - 3} more
+                    </div>
                   )}
                 </div>
 
-                <div className="mt-5 flex items-center gap-1.5 text-xs font-medium" style={{ color: cat.color }}>
-                  Explore <ArrowUpRight size={13} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                <div
+                  className="mt-5 flex items-center gap-1.5 text-xs font-medium"
+                  style={{ color: cat.color }}
+                >
+                  Explore{" "}
+                  <ArrowUpRight
+                    size={13}
+                    className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+                  />
                 </div>
               </div>
 
               {/* Bottom accent */}
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: `linear-gradient(90deg, transparent, ${cat.color}, transparent)` }} />
+              <div
+                className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                style={{
+                  background: `linear-gradient(90deg, transparent, ${cat.color}, transparent)`,
+                }}
+              />
             </motion.button>
           ))}
         </div>
@@ -1727,7 +2591,11 @@ function CategoriesSection({ onCategoryClick, categories }: { onCategoryClick: (
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 
-function Lightbox({ images, startIndex, onClose }: {
+function Lightbox({
+  images,
+  startIndex,
+  onClose,
+}: {
   images: string[];
   startIndex: number;
   onClose: () => void;
@@ -1737,8 +2605,9 @@ function Lightbox({ images, startIndex, onClose }: {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") setCurrent(c => (c + 1) % images.length);
-      if (e.key === "ArrowLeft") setCurrent(c => (c - 1 + images.length) % images.length);
+      if (e.key === "ArrowRight") setCurrent((c) => (c + 1) % images.length);
+      if (e.key === "ArrowLeft")
+        setCurrent((c) => (c - 1 + images.length) % images.length);
     };
     window.addEventListener("keydown", handler);
     document.body.style.overflow = "hidden";
@@ -1748,8 +2617,8 @@ function Lightbox({ images, startIndex, onClose }: {
     };
   }, [images.length, onClose]);
 
-  const prev = () => setCurrent(c => (c - 1 + images.length) % images.length);
-  const next = () => setCurrent(c => (c + 1) % images.length);
+  const prev = () => setCurrent((c) => (c - 1 + images.length) % images.length);
+  const next = () => setCurrent((c) => (c + 1) % images.length);
 
   return (
     <motion.div
@@ -1763,23 +2632,27 @@ function Lightbox({ images, startIndex, onClose }: {
       {/* Top bar */}
       <div
         className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <span className="text-xs font-mono text-white/40 tracking-widest">
-          {String(current + 1).padStart(2, "0")} / {String(images.length).padStart(2, "0")}
+          {String(current + 1).padStart(2, "0")} /{" "}
+          {String(images.length).padStart(2, "0")}
         </span>
         <button
           onClick={onClose}
           className="w-10 h-10 rounded-full flex items-center justify-center border border-white/15 bg-white/5 hover:bg-white/15 transition-all duration-200 group"
         >
-          <X size={17} className="text-white/70 group-hover:text-white transition-colors" />
+          <X
+            size={17}
+            className="text-white/70 group-hover:text-white transition-colors"
+          />
         </button>
       </div>
 
       {/* Main image area */}
       <div
         className="flex-1 flex items-center justify-center relative overflow-hidden px-16 py-6"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {images.length > 1 && (
           <button
@@ -1818,7 +2691,7 @@ function Lightbox({ images, startIndex, onClose }: {
       {images.length > 1 && (
         <div
           className="flex items-center justify-center gap-2 py-4 px-6 border-t border-white/10 shrink-0 overflow-x-auto"
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           {images.map((src, i) => (
             <button
@@ -1842,7 +2715,14 @@ function Lightbox({ images, startIndex, onClose }: {
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAuthOpen, categories }: {
+function ProductCard({
+  product,
+  onProductClick,
+  authUser,
+  onWishlistToggle,
+  onAuthOpen,
+  categories,
+}: {
   product: Product;
   onProductClick: (p: Product) => void;
   authUser: AuthUser | null;
@@ -1856,53 +2736,80 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
 
   const handleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!authUser) { onAuthOpen("login"); return; }
+    if (!authUser) {
+      onAuthOpen("login");
+      return;
+    }
     onWishlistToggle(product.id);
   };
 
   const displayPrice = product.isFree
     ? "Free"
     : product.discountPrice
-      ? `$${product.discountPrice}`
-      : `$${product.price}`;
+    ? `$${product.discountPrice}`
+    : `$${product.price}`;
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onProductClick(product)}
-      className="group relative rounded-3xl overflow-hidden border border-border bg-card transition-all duration-300 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_20px_60px_rgba(0,0,0,0.35)] cursor-pointer">
-
+      className="group relative rounded-3xl overflow-hidden border border-border bg-card transition-all duration-300 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_20px_60px_rgba(0,0,0,0.35)] cursor-pointer"
+    >
       {/* Thumbnail */}
       <div className="relative h-48 overflow-hidden">
-        <img src={product.thumbnail} alt={product.title} loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+        <img
+          src={product.thumbnail}
+          alt={product.title}
+          loading="lazy"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent dark:from-black/70 dark:via-black/20 pointer-events-none" />
 
         {/* Price badge */}
         <div className="absolute top-3 left-3">
           {product.isFree ? (
-            <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">Free</span>
+            <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              Free
+            </span>
           ) : product.discountPrice ? (
             <div className="flex items-center gap-1.5">
-              <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">${product.discountPrice}</span>
-              <span className="px-2 py-1 rounded-full bg-black/50 text-white text-xs line-through opacity-70">${product.price}</span>
+              <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                ${product.discountPrice}
+              </span>
+              <span className="px-2 py-1 rounded-full bg-black/50 text-white text-xs line-through opacity-70">
+                ${product.price}
+              </span>
             </div>
           ) : (
-            <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-bold">${product.price}</span>
+            <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-bold">
+              ${product.price}
+            </span>
           )}
         </div>
 
         {/* Wishlist button */}
         <button
           onClick={handleWishlist}
-          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-200 ${isInWishlist ? "bg-[#1a4d22] text-white dark:bg-[#aaff38] dark:text-[#0F0039]" : "bg-black/40 text-white hover:bg-black/60"}`}>
+          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-200 ${
+            isInWishlist
+              ? "bg-[#1a4d22] text-white dark:bg-[#aaff38] dark:text-[#0F0039]"
+              : "bg-black/40 text-white hover:bg-black/60"
+          }`}
+        >
           <Heart size={14} className={isInWishlist ? "fill-current" : ""} />
         </button>
 
         {/* Hover glow — pointer-events-none so it never blocks the heart button */}
-        <div className={`absolute inset-0 transition-opacity duration-500 pointer-events-none ${hovered ? "opacity-100" : "opacity-0"}`}
-          style={{ background: "linear-gradient(135deg, rgba(82,51,253,0.08) 0%, transparent 60%)" }} />
+        <div
+          className={`absolute inset-0 transition-opacity duration-500 pointer-events-none ${
+            hovered ? "opacity-100" : "opacity-0"
+          }`}
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(82,51,253,0.08) 0%, transparent 60%)",
+          }}
+        />
       </div>
 
       {/* Content */}
@@ -1910,27 +2817,45 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
         {/* Category + arrow */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-            {categories.find(c => c.id === product.categoryId)?.subcategories.find(s => s.id === product.subcategoryId)?.name
-              ?? categories.find(c => c.id === product.categoryId)?.name}
+            {categories
+              .find((c) => c.id === product.categoryId)
+              ?.subcategories.find((s) => s.id === product.subcategoryId)
+              ?.name ??
+              categories.find((c) => c.id === product.categoryId)?.name}
           </span>
-          <ArrowUpRight size={16} className={`text-primary transition-all duration-300 ${hovered ? "opacity-100 translate-x-0.5 -translate-y-0.5" : "opacity-0"}`} />
+          <ArrowUpRight
+            size={16}
+            className={`text-primary transition-all duration-300 ${
+              hovered
+                ? "opacity-100 translate-x-0.5 -translate-y-0.5"
+                : "opacity-0"
+            }`}
+          />
         </div>
 
         <h3 className="text-base font-display font-bold text-foreground mb-1.5 group-hover:text-primary transition-colors duration-300 line-clamp-1">
           {product.title}
         </h3>
-        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-4">{product.shortDescription}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-4">
+          {product.shortDescription}
+        </p>
 
         {/* Stats row */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
             <Star size={11} className="text-primary fill-primary" />
-            <span className="font-mono font-medium text-foreground">{product.rating.toFixed(1)}</span>
+            <span className="font-mono font-medium text-foreground">
+              {product.rating.toFixed(1)}
+            </span>
             <span>({product.reviewsCount})</span>
           </div>
           <div className="flex items-center gap-1">
             <Download size={11} />
-            <span>{product.downloadsCount >= 1000 ? `${(product.downloadsCount / 1000).toFixed(1)}k` : product.downloadsCount}</span>
+            <span>
+              {product.downloadsCount >= 1000
+                ? `${(product.downloadsCount / 1000).toFixed(1)}k`
+                : product.downloadsCount}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Shield size={11} />
@@ -1941,29 +2866,50 @@ function ProductCard({ product, onProductClick, authUser, onWishlistToggle, onAu
         {/* Figma feature badges */}
         <div className="flex flex-wrap gap-1.5 mt-3">
           {product.supportsVariables && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Variables</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+              Variables
+            </span>
           )}
           {product.supportsAutoLayout && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Auto Layout</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+              Auto Layout
+            </span>
           )}
           {product.supportsLightDark && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Light/Dark</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+              Light/Dark
+            </span>
           )}
         </div>
       </div>
 
       {/* Bottom accent */}
-      <div className={`absolute bottom-0 left-0 right-0 h-0.5 transition-opacity duration-500 ${hovered ? "opacity-100" : "opacity-0"}`}
-        style={{ background: "linear-gradient(90deg, transparent, #aaff38, transparent)" }} />
+      <div
+        className={`absolute bottom-0 left-0 right-0 h-0.5 transition-opacity duration-500 ${
+          hovered ? "opacity-100" : "opacity-0"
+        }`}
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, #aaff38, transparent)",
+        }}
+      />
     </div>
   );
 }
 
 // ─── Featured Products ────────────────────────────────────────────────────────
 
-function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWishlistToggle, onAuthOpen, categories }: {
+function FeaturedProducts({
+  products,
+  onProductClick,
+  onNavigate,
+  authUser,
+  onWishlistToggle,
+  onAuthOpen,
+  categories,
+}: {
   products: Product[];
-  
+
   onProductClick: (p: Product) => void;
   onNavigate: (p: Page) => void;
   authUser: AuthUser | null;
@@ -1975,29 +2921,51 @@ function FeaturedProducts({ products, onProductClick, onNavigate, authUser, onWi
   const inView = useInView(ref, { once: true, margin: "-60px" });
   // TODO: Replace with GET ${API_BASE}/products/featured
   const featured = products.slice(0, 6);
-  
-  console.log('Featured products prop received:', products.length, 'products, featured slice:', featured.length);
+
+  console.log(
+    "Featured products prop received:",
+    products.length,
+    "products, featured slice:",
+    featured.length
+  );
 
   return (
     <section id="featured" ref={ref} className="py-24 lg:py-32">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5 }}
-          className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-16"
+        >
           <div>
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">Top Picks</span>
-            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">Featured Resources</h2>
+            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+              Top Picks
+            </span>
+            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
+              Featured Resources
+            </h2>
           </div>
-          <button onClick={() => onNavigate("browse")}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group shrink-0">
+          <button
+            onClick={() => onNavigate("browse")}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors group shrink-0"
+          >
             View all resources
-            <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            <ArrowUpRight
+              size={14}
+              className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+            />
           </button>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {featured.map((product, i) => (
-            <motion.div key={product.id} initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, delay: i * 0.08 }}>
+            <motion.div
+              key={product.id}
+              initial={{ opacity: 0, y: 40 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, delay: i * 0.08 }}
+            >
               <ProductCard
                 product={product}
                 onProductClick={onProductClick}
@@ -2021,17 +2989,20 @@ function HowItWorks() {
   const inView = useInView(ref, { once: true, margin: "-80px" });
   const steps = [
     {
-      icon: Search, step: "01",
+      icon: Search,
+      step: "01",
       title: "Browse & Discover",
       desc: "Explore 500+ curated Figma resources across UI kits, templates, wireframes, and icon packs — all categorized for fast discovery.",
     },
     {
-      icon: Download, step: "02",
+      icon: Download,
+      step: "02",
       title: "Get Your Resource",
       desc: "Download free resources instantly or purchase premium kits with secure checkout. Your library is always one click away.",
     },
     {
-      icon: Zap, step: "03",
+      icon: Zap,
+      step: "03",
       title: "Customize & Ship",
       desc: "Open directly in Figma, swap tokens, adapt components, and ship your design faster than ever before.",
     },
@@ -2040,9 +3011,15 @@ function HowItWorks() {
   return (
     <section ref={ref} className="py-24 lg:py-32 bg-muted/30">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5 }}
-          className="text-center mb-16">
-          <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">How It Works</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
+          <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+            How It Works
+          </span>
           <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
             From browse to done in minutes
           </h2>
@@ -2050,16 +3027,31 @@ function HowItWorks() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {steps.map(({ icon: Icon, step, title, desc }, i) => (
-            <TiltCard key={step} className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_6px_32px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_60px_rgba(82,51,253,0.12)] relative overflow-hidden">
-              <motion.div initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
+            <TiltCard
+              key={step}
+              className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_6px_32px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_60px_rgba(82,51,253,0.12)] relative overflow-hidden"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: i * 0.12 }}
-                className="p-8">
-                <div className="absolute top-4 right-5 text-6xl font-display font-black text-foreground/5 select-none">{step}</div>
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 group-hover:bg-primary group-hover:border-primary transition-all duration-300">
-                  <Icon size={20} className="text-primary group-hover:text-primary-foreground transition-colors duration-300" />
+                className="p-8"
+              >
+                <div className="absolute top-4 right-5 text-6xl font-display font-black text-foreground/5 select-none">
+                  {step}
                 </div>
-                <h3 className="text-xl font-display font-bold text-foreground mb-3">{title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 group-hover:bg-primary group-hover:border-primary transition-all duration-300">
+                  <Icon
+                    size={20}
+                    className="text-primary group-hover:text-primary-foreground transition-colors duration-300"
+                  />
+                </div>
+                <h3 className="text-xl font-display font-bold text-foreground mb-3">
+                  {title}
+                </h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {desc}
+                </p>
               </motion.div>
             </TiltCard>
           ))}
@@ -2071,7 +3063,14 @@ function HowItWorks() {
 
 // ─── Product Detail Page ──────────────────────────────────────────────────────
 
-function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle, categories }: {
+function ProductDetail({
+  product,
+  onBack,
+  authUser,
+  onAuthOpen,
+  onWishlistToggle,
+  categories,
+}: {
   product: Product;
   onBack: () => void;
   authUser: AuthUser | null;
@@ -2079,11 +3078,13 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
   onWishlistToggle: (id: string) => void;
   categories: Category[];
 }) {
-
   useEffect(() => {
     const loadStatsAndRecordView = async () => {
       // 1) سجل مشاهدة
-      const viewerKey = authUser?.id || localStorage.getItem("ld_viewer_key") || crypto.randomUUID();
+      const viewerKey =
+        authUser?.id ||
+        localStorage.getItem("ld_viewer_key") ||
+        crypto.randomUUID();
       if (!localStorage.getItem("ld_viewer_key") && !authUser) {
         localStorage.setItem("ld_viewer_key", viewerKey);
       }
@@ -2134,7 +3135,9 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
     rating: product.rating || 0,
     reviewsCount: product.reviewsCount || 0,
   });
-  const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [downloadStatus, setDownloadStatus] = useState<
+    "idle" | "loading" | "success"
+  >("idle");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [alreadyDownloadedModal, setAlreadyDownloadedModal] = useState(false);
   const isOwned = authUser?.purchases.includes(product.id) ?? false;
@@ -2149,22 +3152,25 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
   }, [product.id]);
 
   const handleGetResource = async () => {
-    if (!authUser) { onAuthOpen("login"); return; }
+    if (!authUser) {
+      onAuthOpen("login");
+      return;
+    }
 
     if (product.isFree || isOwned) {
       setDownloadStatus("loading");
       try {
         // Check if user already downloaded this product
         const { data: existingDownload, error: checkError } = await supabase
-          .from('downloads')
-          .select('id')
-          .eq('user_id', authUser.id)
-          .eq('product_id', product.id)
+          .from("downloads")
+          .select("id")
+          .eq("user_id", authUser.id)
+          .eq("product_id", product.id)
           .single();
 
-        if (checkError && checkError.code !== 'PGRST116') {
+        if (checkError && checkError.code !== "PGRST116") {
           // PGRST116 = no rows found (expected), other errors are real failures
-          console.error('Error checking downloads:', checkError);
+          console.error("Error checking downloads:", checkError);
           setDownloadStatus("idle");
           return;
         }
@@ -2177,22 +3183,20 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
         }
 
         // First time download – insert into downloads table
-        const { error: insertError } = await supabase
-          .from('downloads')
-          .insert({
-            user_id: authUser.id,
-            product_id: product.id,
-            downloaded_at: new Date().toISOString(),
-          });
+        const { error: insertError } = await supabase.from("downloads").insert({
+          user_id: authUser.id,
+          product_id: product.id,
+          downloaded_at: new Date().toISOString(),
+        });
 
         if (insertError) {
-          console.error('Error recording download:', insertError);
+          console.error("Error recording download:", insertError);
           setDownloadStatus("idle");
           return;
         }
 
         // Trigger file download using the secure URL
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = product.downloadFileUrl;
         link.download = `${product.slug}.zip`;
         document.body.appendChild(link);
@@ -2202,7 +3206,7 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
         setDownloadStatus("success");
         setTimeout(() => setDownloadStatus("idle"), 3000);
       } catch (err) {
-        console.error('Download error:', err);
+        console.error("Download error:", err);
         setDownloadStatus("idle");
       }
       return;
@@ -2217,16 +3221,24 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
     alert(`Purchase flow: integrate Stripe here for $${product.price}`);
   };
 
-  const category = categories.find(c => c.id === product.categoryId);
-  const subcategory = category?.subcategories.find(s => s.id === product.subcategoryId);
+  const category = categories.find((c) => c.id === product.categoryId);
+  const subcategory = category?.subcategories.find(
+    (s) => s.id === product.subcategoryId
+  );
 
   const specs = [
     { label: "File Size", value: product.fileSize },
     { label: "Formats", value: product.formats.join(", ") },
-    { label: "Screens", value: product.screensCount > 0 ? `${product.screensCount}+` : "N/A" },
+    {
+      label: "Screens",
+      value: product.screensCount > 0 ? `${product.screensCount}+` : "N/A",
+    },
     { label: "Components", value: `${product.componentsCount}+` },
     { label: "Version", value: product.version },
-    { label: "License", value: product.licenseType === "commercial" ? "Commercial" : "Personal" },
+    {
+      label: "License",
+      value: product.licenseType === "commercial" ? "Commercial" : "Personal",
+    },
   ];
 
   const figmaFeatures = [
@@ -2236,36 +3248,50 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Ambient glow */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[140px] bg-primary/6" />
       </div>
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-4 lg:px-8 pt-28 lg:pt-32 pb-20">
-
         {/* Back */}
-        <button onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8 group">
-          <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8 group"
+        >
+          <ChevronLeft
+            size={16}
+            className="group-hover:-translate-x-1 transition-transform"
+          />
           Back to marketplace
         </button>
 
         {/* Two-column layout */}
         <div className="grid lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] gap-8 items-start">
-
           {/* ── LEFT: scrollable content ─────────────────────────────── */}
           <div className="min-w-0">
-            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
               {/* Category badges */}
               <div className="flex flex-wrap items-center gap-2 mb-4">
                 {category && (
-                  <span className="text-xs font-mono px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{category.name}</span>
+                  <span className="text-xs font-mono px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    {category.name}
+                  </span>
                 )}
                 {subcategory && (
-                  <span className="text-xs font-mono px-3 py-1.5 rounded-full border border-border text-muted-foreground">{subcategory.name}</span>
+                  <span className="text-xs font-mono px-3 py-1.5 rounded-full border border-border text-muted-foreground">
+                    {subcategory.name}
+                  </span>
                 )}
               </div>
 
@@ -2275,47 +3301,71 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
               </h1>
 
               {/* Description */}
-              <p className="text-base text-muted-foreground leading-relaxed mb-6">{product.fullDescription}</p>
+              <p className="text-base text-muted-foreground leading-relaxed mb-6">
+                {product.fullDescription}
+              </p>
 
               {/* Stats */}
               <div className="flex flex-wrap gap-5 text-sm text-muted-foreground mb-6">
                 <div className="flex items-center gap-1.5">
                   <Star size={13} className="text-primary fill-primary" />
-                  <span className="font-mono font-bold text-foreground">{stats.rating.toFixed(1)}</span>
+                  <span className="font-mono font-bold text-foreground">
+                    {stats.rating.toFixed(1)}
+                  </span>
                   <span>({stats.reviewsCount} reviews)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Download size={13} />
-                  <span className="font-mono font-bold text-foreground">{stats.downloadsCount.toLocaleString()}</span> downloads
+                  <span className="font-mono font-bold text-foreground">
+                    {stats.downloadsCount.toLocaleString()}
+                  </span>{" "}
+                  downloads
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Eye size={13} />
-                  <span className="font-mono font-bold text-foreground">{stats.viewsCount.toLocaleString()}</span> views
+                  <span className="font-mono font-bold text-foreground">
+                    {stats.viewsCount.toLocaleString()}
+                  </span>{" "}
+                  views
                 </div>
               </div>
 
               {/* Tags */}
               <div className="flex items-center gap-2 flex-wrap pb-8 border-b border-border mb-10">
-                <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest shrink-0">Tags ·</span>
-                {product.tags.map(tag => (
-                  <span key={tag} className="px-3 py-1 text-xs font-medium rounded-full border border-primary/20 bg-primary/10 text-primary">
+                <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest shrink-0">
+                  Tags ·
+                </span>
+                {product.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-3 py-1 text-xs font-medium rounded-full border border-primary/20 bg-primary/10 text-primary"
+                  >
                     {tag}
                   </span>
                 ))}
               </div>
 
               {/* Gallery */}
-              <h2 className="text-xl font-display font-bold text-foreground mb-6">Preview Gallery</h2>
+              <h2 className="text-xl font-display font-bold text-foreground mb-6">
+                Preview Gallery
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {product.galleryImages.map((src, i) => (
-                  <motion.div key={i}
-                    initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.45, delay: (i % 2) * 0.08 }}
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 24 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-60px" }}
+                    transition={{ duration: 0.45, delay: (i % 2) * 0.08 }}
                     className="group relative rounded-2xl overflow-hidden border border-border bg-card aspect-[3/2] cursor-zoom-in"
                     onClick={() => setLightboxIndex(i)}
                   >
-                    <img src={src} alt={`${product.title} preview ${i + 1}`} loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img
+                      src={src}
+                      alt={`${product.title} preview ${i + 1}`}
+                      loading="lazy"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                       <div className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center">
@@ -2323,120 +3373,177 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
                       </div>
                     </div>
                     <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs font-mono opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-                      {String(i + 1).padStart(2, "0")} / {String(product.galleryImages.length).padStart(2, "0")}
+                      {String(i + 1).padStart(2, "0")} /{" "}
+                      {String(product.galleryImages.length).padStart(2, "0")}
                     </div>
                   </motion.div>
                 ))}
               </div>
-
             </motion.div>
           </div>
 
           {/* ── RIGHT: sticky purchase card ──────────────────────────── */}
           {/* Sticky must be on a plain div — motion.div transform breaks position:sticky */}
           <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <div className="p-6 rounded-3xl border border-border bg-card shadow-xl">
-
-              {/* Price */}
-              <div className="mb-5">
-                {product.isFree ? (
-                  <div className="text-4xl font-display font-black text-primary">Free</div>
-                ) : (
-                  <div className="flex items-baseline gap-3">
-                    <div className="text-4xl font-display font-black text-foreground">
-                      ${product.discountPrice ?? product.price}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <div className="p-6 rounded-3xl border border-border bg-card shadow-xl">
+                {/* Price */}
+                <div className="mb-5">
+                  {product.isFree ? (
+                    <div className="text-4xl font-display font-black text-primary">
+                      Free
                     </div>
-                    {product.discountPrice && (
-                      <div className="text-xl text-muted-foreground line-through">${product.price}</div>
-                    )}
-                  </div>
-                )}
-                {product.discountPrice && (
-                  <span className="text-xs font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full mt-2 inline-block">
-                    Save ${product.price - product.discountPrice}
-                  </span>
-                )}
-              </div>
-
-              {/* Primary CTA */}
-              <button onClick={handleGetResource}
-                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:opacity-90 disabled:opacity-60 transition-all duration-300 mb-3">
-                {downloadStatus === "loading" ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    Preparing download...
-                  </span>
-                ) : downloadStatus === "success" ? (
-                  <span className="flex items-center gap-2"><CheckCircle size={16} /> Downloaded!</span>
-                ) : isOwned ? (
-                  <span className="flex items-center gap-2"><Download size={16} /> Download Again</span>
-                ) : product.isFree ? (
-                  <span className="flex items-center gap-2"><Download size={16} /> Download Free</span>
-                ) : (
-                  <span className="flex items-center gap-2"><Check size={16} /> Get for ${product.discountPrice ?? product.price}</span>
-                )}
-              </button>
-
-              {/* Save + Preview */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { if (!authUser) { onAuthOpen("login"); return; } onWishlistToggle(product.id); }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold transition-all duration-200 ${
-                    isInWishlist
-                      ? "border-[#1a4d22] bg-[#1a4d22] text-white dark:border-[#aaff38] dark:bg-[#aaff38] dark:text-[#0F0039]"
-                      : "border-border hover:border-primary/30 text-muted-foreground hover:text-foreground"
-                  }`}>
-                  <Heart size={14} className={isInWishlist ? "fill-current" : ""} />
-                  {isInWishlist ? "Saved" : "Save"}
-                </button>
-                {product.figmaPreviewUrl && (
-                  <a href={product.figmaPreviewUrl} target="_blank" rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all duration-200">
-                    <ExternalLink size={14} />
-                    Preview
-                  </a>
-                )}
-              </div>
-
-              {/* Specs */}
-              <div className="mt-5 pt-5 border-t border-border space-y-3">
-                {specs.map(({ label, value }) => (
-                  <div key={label} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{label}</span>
-                    <span className="font-mono text-foreground font-medium">{value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Figma features */}
-              <div className="mt-5 pt-5 border-t border-border">
-                <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">Figma Features</p>
-                <div className="space-y-2">
-                  {figmaFeatures.map(({ label, supported }) => (
-                    <div key={label} className="flex items-center gap-2 text-sm">
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${supported ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-                        {supported ? <Check size={11} /> : <Minus size={11} />}
+                  ) : (
+                    <div className="flex items-baseline gap-3">
+                      <div className="text-4xl font-display font-black text-foreground">
+                        ${product.discountPrice ?? product.price}
                       </div>
-                      <span className={supported ? "text-foreground" : "text-muted-foreground line-through"}>{label}</span>
+                      {product.discountPrice && (
+                        <div className="text-xl text-muted-foreground line-through">
+                          ${product.price}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {product.discountPrice && (
+                    <span className="text-xs font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full mt-2 inline-block">
+                      Save ${product.price - product.discountPrice}
+                    </span>
+                  )}
+                </div>
+
+                {/* Primary CTA */}
+                <button
+                  onClick={handleGetResource}
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:opacity-90 disabled:opacity-60 transition-all duration-300 mb-3"
+                >
+                  {downloadStatus === "loading" ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Preparing download...
+                    </span>
+                  ) : downloadStatus === "success" ? (
+                    <span className="flex items-center gap-2">
+                      <CheckCircle size={16} /> Downloaded!
+                    </span>
+                  ) : isOwned ? (
+                    <span className="flex items-center gap-2">
+                      <Download size={16} /> Download Again
+                    </span>
+                  ) : product.isFree ? (
+                    <span className="flex items-center gap-2">
+                      <Download size={16} /> Download Free
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Check size={16} /> Get for $
+                      {product.discountPrice ?? product.price}
+                    </span>
+                  )}
+                </button>
+
+                {/* Save + Preview */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!authUser) {
+                        onAuthOpen("login");
+                        return;
+                      }
+                      onWishlistToggle(product.id);
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold transition-all duration-200 ${
+                      isInWishlist
+                        ? "border-[#1a4d22] bg-[#1a4d22] text-white dark:border-[#aaff38] dark:bg-[#aaff38] dark:text-[#0F0039]"
+                        : "border-border hover:border-primary/30 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Heart
+                      size={14}
+                      className={isInWishlist ? "fill-current" : ""}
+                    />
+                    {isInWishlist ? "Saved" : "Save"}
+                  </button>
+                  {product.figmaPreviewUrl && (
+                    <a
+                      href={product.figmaPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all duration-200"
+                    >
+                      <ExternalLink size={14} />
+                      Preview
+                    </a>
+                  )}
+                </div>
+
+                {/* Specs */}
+                <div className="mt-5 pt-5 border-t border-border space-y-3">
+                  {specs.map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="font-mono text-foreground font-medium">
+                        {value}
+                      </span>
                     </div>
                   ))}
                 </div>
+
+                {/* Figma features */}
+                <div className="mt-5 pt-5 border-t border-border">
+                  <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">
+                    Figma Features
+                  </p>
+                  <div className="space-y-2">
+                    {figmaFeatures.map(({ label, supported }) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                            supported
+                              ? "bg-primary/20 text-primary"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {supported ? (
+                            <Check size={11} />
+                          ) : (
+                            <Minus size={11} />
+                          )}
+                        </div>
+                        <span
+                          className={
+                            supported
+                              ? "text-foreground"
+                              : "text-muted-foreground line-through"
+                          }
+                        >
+                          {label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* License */}
+                <p className="text-xs text-muted-foreground mt-4 flex items-start gap-2">
+                  <Shield size={12} className="text-primary shrink-0 mt-0.5" />
+                  {product.licenseType === "commercial"
+                    ? "Commercial license — use in client & commercial projects."
+                    : "Personal license — for personal & portfolio use only."}
+                </p>
               </div>
-
-              {/* License */}
-              <p className="text-xs text-muted-foreground mt-4 flex items-start gap-2">
-                <Shield size={12} className="text-primary shrink-0 mt-0.5" />
-                {product.licenseType === "commercial"
-                  ? "Commercial license — use in client & commercial projects."
-                  : "Personal license — for personal & portfolio use only."}
-              </p>
-            </div>
-          </motion.div>
+            </motion.div>
           </div>
-
         </div>
       </div>
 
@@ -2451,7 +3558,8 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.6 }}>
+            transition={{ duration: 0.6 }}
+          >
             <h2 className="text-3xl lg:text-5xl font-display font-extrabold text-foreground mb-4">
               Ready to use it?
             </h2>
@@ -2461,14 +3569,25 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
                 : "One-time purchase — yours forever. No subscription needed."}
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <button onClick={handleGetResource}
-                className="flex items-center gap-2.5 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:opacity-90 transition-all duration-300 shadow-[0_0_32px_rgba(82,51,253,0.2)]">
-                {product.isFree
-                  ? <><Download size={17} /> Download Free</>
-                  : <><Check size={17} /> Get for ${product.discountPrice ?? product.price}</>}
+              <button
+                onClick={handleGetResource}
+                className="flex items-center gap-2.5 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:opacity-90 transition-all duration-300 shadow-[0_0_32px_rgba(82,51,253,0.2)]"
+              >
+                {product.isFree ? (
+                  <>
+                    <Download size={17} /> Download Free
+                  </>
+                ) : (
+                  <>
+                    <Check size={17} /> Get for $
+                    {product.discountPrice ?? product.price}
+                  </>
+                )}
               </button>
-              <button onClick={onBack}
-                className="flex items-center gap-2.5 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300">
+              <button
+                onClick={onBack}
+                className="flex items-center gap-2.5 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+              >
                 Browse more
               </button>
             </div>
@@ -2502,18 +3621,21 @@ function ProductDetail({ product, onBack, authUser, onAuthOpen, onWishlistToggle
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="w-full max-w-md p-6 rounded-2xl bg-card border border-border shadow-xl"
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                   <CheckCircle size={24} className="text-primary" />
                 </div>
-                <h3 className="text-lg font-display font-bold text-foreground">Already Downloaded</h3>
+                <h3 className="text-lg font-display font-bold text-foreground">
+                  Already Downloaded
+                </h3>
               </div>
-              
+
               <p className="text-muted-foreground text-sm mb-6">
-                You already downloaded this file. You can find it in your library or download it again.
+                You already downloaded this file. You can find it in your
+                library or download it again.
               </p>
 
               <div className="flex gap-3">
@@ -2573,52 +3695,79 @@ function BrowsePage({
   // Update filters when initialFilters change (e.g., search from hero)
   useEffect(() => {
     if (initialFilters) {
-      setFilters(f => ({ ...f, ...initialFilters }));
+      setFilters((f) => ({ ...f, ...initialFilters }));
     }
   }, [initialFilters?.query, initialFilters?.categoryId]);
 
   const toggleCatExpand = (catId: string) => {
-    setExpandedCats(e => e.includes(catId) ? e.filter(c => c !== catId) : [...e, catId]);
+    setExpandedCats((e) =>
+      e.includes(catId) ? e.filter((c) => c !== catId) : [...e, catId]
+    );
   };
 
   // Client-side filter + sort
   // TODO: Replace with GET ${API_BASE}/products?q=&category=&subcategory=&isFree=&sort=&page=&limit=
   const filtered = useMemo(() => {
-    return products.filter(p => {
-      if (filters.categoryId && p.categoryId !== filters.categoryId) return false;
-      if (filters.subcategoryId && p.subcategoryId !== filters.subcategoryId) return false;
-      if (filters.isFree !== null && p.isFree !== filters.isFree) return false;
-      if (filters.query) {
-        const q = filters.query.toLowerCase();
-        return (
-          p.title.toLowerCase().includes(q) ||
-          p.shortDescription.toLowerCase().includes(q) ||
-          p.tags.some(t => t.toLowerCase().includes(q)) ||
-          categories.find(c => c.id === p.categoryId)?.name.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    }).sort((a, b) => {
-      switch (filters.sortBy) {
-        case "downloads": return b.downloadsCount - a.downloadsCount;
-        case "rating": return b.rating - a.rating;
-        case "price-asc": return a.price - b.price;
-        case "price-desc": return b.price - a.price;
-        default: return parseInt(b.id.slice(1)) - parseInt(a.id.slice(1)); // newest by id
-      }
-    });
+    return products
+      .filter((p) => {
+        if (filters.categoryId && p.categoryId !== filters.categoryId)
+          return false;
+        if (filters.subcategoryId && p.subcategoryId !== filters.subcategoryId)
+          return false;
+        if (filters.isFree !== null && p.isFree !== filters.isFree)
+          return false;
+        if (filters.query) {
+          const q = filters.query.toLowerCase();
+          return (
+            p.title.toLowerCase().includes(q) ||
+            p.shortDescription.toLowerCase().includes(q) ||
+            p.tags.some((t) => t.toLowerCase().includes(q)) ||
+            categories
+              .find((c) => c.id === p.categoryId)
+              ?.name.toLowerCase()
+              .includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        switch (filters.sortBy) {
+          case "downloads":
+            return b.downloadsCount - a.downloadsCount;
+          case "rating":
+            return b.rating - a.rating;
+          case "price-asc":
+            return a.price - b.price;
+          case "price-desc":
+            return b.price - a.price;
+          default:
+            return parseInt(b.id.slice(1)) - parseInt(a.id.slice(1)); // newest by id
+        }
+      });
   }, [filters, products, categories]);
 
   const Sidebar = () => (
     <div className="space-y-6">
       {/* Price filter */}
       <div>
-        <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">Price</h4>
+        <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">
+          Price
+        </h4>
         <div className="space-y-1">
-          {[{ label: "All", value: null }, { label: "Free", value: true }, { label: "Paid", value: false }].map(opt => (
-            <button key={opt.label}
-              onClick={() => setFilters(f => ({ ...f, isFree: opt.value }))}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${filters.isFree === opt.value ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+          {[
+            { label: "All", value: null },
+            { label: "Free", value: true },
+            { label: "Paid", value: false },
+          ].map((opt) => (
+            <button
+              key={opt.label}
+              onClick={() => setFilters((f) => ({ ...f, isFree: opt.value }))}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${
+                filters.isFree === opt.value
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
               {opt.label}
               {filters.isFree === opt.value && <Check size={13} />}
             </button>
@@ -2628,37 +3777,80 @@ function BrowsePage({
 
       {/* Category filter */}
       <div>
-        <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">Category</h4>
+        <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">
+          Category
+        </h4>
         <div className="space-y-1">
           {/* All */}
           <button
-            onClick={() => setFilters(f => ({ ...f, categoryId: null, subcategoryId: null }))}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${!filters.categoryId ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+            onClick={() =>
+              setFilters((f) => ({
+                ...f,
+                categoryId: null,
+                subcategoryId: null,
+              }))
+            }
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors ${
+              !filters.categoryId
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            }`}
+          >
             All Categories
             {!filters.categoryId && <Check size={13} />}
           </button>
 
-          {categories.map(cat => (
+          {categories.map((cat) => (
             <div key={cat.id}>
               <button
                 onClick={() => {
-                  setFilters(f => ({ ...f, categoryId: cat.id, subcategoryId: null }));
+                  setFilters((f) => ({
+                    ...f,
+                    categoryId: cat.id,
+                    subcategoryId: null,
+                  }));
                   toggleCatExpand(cat.id);
                 }}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors ${filters.categoryId === cat.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors ${
+                  filters.categoryId === cat.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
                 <cat.icon size={14} style={{ color: cat.color }} />
                 <span className="flex-1 text-left truncate">{cat.name}</span>
-                <ChevronDown size={13} className={`transition-transform ${expandedCats.includes(cat.id) ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  size={13}
+                  className={`transition-transform ${
+                    expandedCats.includes(cat.id) ? "rotate-180" : ""
+                  }`}
+                />
               </button>
 
               <AnimatePresence>
                 {expandedCats.includes(cat.id) && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
-                    className="overflow-hidden pl-4">
-                    {cat.subcategories.map(sub => (
-                      <button key={sub.id}
-                        onClick={() => setFilters(f => ({ ...f, categoryId: cat.id, subcategoryId: sub.id }))}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-colors ${filters.subcategoryId === sub.id ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}>
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: "auto" }}
+                    exit={{ height: 0 }}
+                    className="overflow-hidden pl-4"
+                  >
+                    {cat.subcategories.map((sub) => (
+                      <button
+                        key={sub.id}
+                        onClick={() =>
+                          setFilters((f) => ({
+                            ...f,
+                            categoryId: cat.id,
+                            subcategoryId: sub.id,
+                          }))
+                        }
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-colors ${
+                          filters.subcategoryId === sub.id
+                            ? "text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                        }`}
+                      >
                         <span className="w-1 h-1 rounded-full bg-current shrink-0" />
                         {sub.name}
                       </button>
@@ -2672,10 +3864,22 @@ function BrowsePage({
       </div>
 
       {/* Clear filters */}
-      {(filters.categoryId || filters.subcategoryId || filters.isFree !== null || filters.query) && (
+      {(filters.categoryId ||
+        filters.subcategoryId ||
+        filters.isFree !== null ||
+        filters.query) && (
         <button
-          onClick={() => setFilters({ query: "", categoryId: null, subcategoryId: null, isFree: null, sortBy: "newest" })}
-          className="w-full py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors">
+          onClick={() =>
+            setFilters({
+              query: "",
+              categoryId: null,
+              subcategoryId: null,
+              isFree: null,
+              sortBy: "newest",
+            })
+          }
+          className="w-full py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+        >
           Clear all filters
         </button>
       )}
@@ -2683,10 +3887,13 @@ function BrowsePage({
   );
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-      className="min-h-screen pt-20 lg:pt-24">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="min-h-screen pt-20 lg:pt-24"
+    >
       <div className="max-w-7xl mx-auto px-4 lg:px-10 py-10 lg:py-14">
-
         {/* Page header */}
         <div className="mb-8">
           <h1 className="text-3xl lg:text-4xl font-display font-extrabold text-foreground mb-2">
@@ -2700,13 +3907,18 @@ function BrowsePage({
         {/* Toolbar */}
         <div className="flex items-center gap-3 mb-8 flex-wrap">
           {/* Mobile filter toggle */}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm text-foreground hover:border-primary/40 transition-colors">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm text-foreground hover:border-primary/40 transition-colors"
+          >
             <Filter size={14} />
             Filters
             {(filters.categoryId || filters.isFree !== null) && (
               <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                {[filters.categoryId, filters.isFree !== null].filter(Boolean).length}
+                {
+                  [filters.categoryId, filters.isFree !== null].filter(Boolean)
+                    .length
+                }
               </span>
             )}
           </button>
@@ -2716,12 +3928,17 @@ function BrowsePage({
             <Search size={14} className="text-muted-foreground shrink-0" />
             <input
               value={filters.query}
-              onChange={e => setFilters(f => ({ ...f, query: e.target.value }))}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, query: e.target.value }))
+              }
               placeholder="Search resources..."
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none" />
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+            />
             {filters.query && (
-              <button onClick={() => setFilters(f => ({ ...f, query: "" }))}
-                className="text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                onClick={() => setFilters((f) => ({ ...f, query: "" }))}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 <X size={13} />
               </button>
             )}
@@ -2730,8 +3947,14 @@ function BrowsePage({
           {/* Sort */}
           <select
             value={filters.sortBy}
-            onChange={e => setFilters(f => ({ ...f, sortBy: e.target.value as BrowseFilters["sortBy"] }))}
-            className="px-4 py-2.5 rounded-xl border border-border bg-card text-sm text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
+            onChange={(e) =>
+              setFilters((f) => ({
+                ...f,
+                sortBy: e.target.value as BrowseFilters["sortBy"],
+              }))
+            }
+            className="px-4 py-2.5 rounded-xl border border-border bg-card text-sm text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer"
+          >
             <option value="newest">Newest First</option>
             <option value="downloads">Most Downloaded</option>
             <option value="rating">Highest Rated</option>
@@ -2744,16 +3967,28 @@ function BrowsePage({
         <AnimatePresence>
           {sidebarOpen && (
             <>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-                onClick={() => setSidebarOpen(false)} />
-              <motion.div initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
+                onClick={() => setSidebarOpen(false)}
+              />
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border z-50 p-6 overflow-y-auto lg:hidden">
+                className="fixed left-0 top-0 bottom-0 w-72 bg-card border-r border-border z-50 p-6 overflow-y-auto lg:hidden"
+              >
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-display font-bold text-foreground">Filters</h3>
-                  <button onClick={() => setSidebarOpen(false)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 transition-colors">
+                  <h3 className="font-display font-bold text-foreground">
+                    Filters
+                  </h3>
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 transition-colors"
+                  >
                     <X size={14} />
                   </button>
                 </div>
@@ -2777,19 +4012,39 @@ function BrowsePage({
             {filtered.length === 0 ? (
               <div className="text-center py-24">
                 <div className="text-6xl mb-4 opacity-20">🔍</div>
-                <h3 className="text-xl font-display font-bold text-foreground mb-2">No resources found</h3>
-                <p className="text-muted-foreground text-sm">Try a different search term or adjust the filters.</p>
+                <h3 className="text-xl font-display font-bold text-foreground mb-2">
+                  No resources found
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Try a different search term or adjust the filters.
+                </p>
                 <button
-                  onClick={() => setFilters({ query: "", categoryId: null, subcategoryId: null, isFree: null, sortBy: "newest" })}
-                  className="mt-6 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity">
+                  onClick={() =>
+                    setFilters({
+                      query: "",
+                      categoryId: null,
+                      subcategoryId: null,
+                      isFree: null,
+                      sortBy: "newest",
+                    })
+                  }
+                  className="mt-6 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+                >
                   Clear filters
                 </button>
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filtered.map((product, i) => (
-                  <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: Math.min(i * 0.05, 0.4) }}>
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: Math.min(i * 0.05, 0.4),
+                    }}
+                  >
                     <ProductCard
                       product={product}
                       onProductClick={onProductClick}
@@ -2811,22 +4066,33 @@ function BrowsePage({
 
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 
-function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
+function ProfilePage({
+  authUser,
+  onUpdate,
+  onLogout,
+  onProductClick,
+}: {
   authUser: AuthUser;
   onUpdate: (updated: Partial<AuthUser>) => void;
   onLogout: () => void;
   onProductClick: (p: Product) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"account" | "library" | "wishlist" | "settings">("account");
+  const [activeTab, setActiveTab] = useState<
+    "account" | "library" | "wishlist" | "settings"
+  >("account");
   const [profileForm, setProfileForm] = useState({
     name: authUser.name,
     email: authUser.email,
     bio: authUser.bio ?? "",
     website: authUser.website ?? "",
   });
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
-  const [pwStatus, setPwStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [pwStatus, setPwStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [libraryProducts, setLibraryProducts] = useState<Product[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(true);
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
@@ -2839,33 +4105,33 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
         setLibraryLoading(true);
         // Get downloads table entries for this user
         const { data: downloads, error: downloadsError } = await supabase
-          .from('downloads')
-          .select('product_id')
-          .eq('user_id', authUser.id);
+          .from("downloads")
+          .select("product_id")
+          .eq("user_id", authUser.id);
 
         if (downloadsError) {
-          console.error('Error fetching downloads:', downloadsError);
+          console.error("Error fetching downloads:", downloadsError);
           setLibraryLoading(false);
           return;
         }
 
         // Get the product details for each downloaded product
         if (downloads && downloads.length > 0) {
-          const productIds = downloads.map(d => d.product_id);
+          const productIds = downloads.map((d) => d.product_id);
           const { data: products, error: productsError } = await supabase
-            .from('products')
-            .select('*')
-            .in('id', productIds);
+            .from("products")
+            .select("*")
+            .in("id", productIds);
 
           if (productsError) {
-            console.error('Error fetching products:', productsError);
+            console.error("Error fetching products:", productsError);
           } else {
             setLibraryProducts(products || []);
           }
         }
         setLibraryLoading(false);
       } catch (err) {
-        console.error('Error fetching library:', err);
+        console.error("Error fetching library:", err);
         setLibraryLoading(false);
       }
     };
@@ -2880,26 +4146,26 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
         setWishlistLoading(true);
         // Get wishlist entries for this user
         const { data: wishlist, error: wishlistError } = await supabase
-          .from('wishlist')
-          .select('product_id')
-          .eq('user_id', authUser.id);
+          .from("wishlist")
+          .select("product_id")
+          .eq("user_id", authUser.id);
 
         if (wishlistError) {
-          console.error('Error fetching wishlist:', wishlistError);
+          console.error("Error fetching wishlist:", wishlistError);
           setWishlistLoading(false);
           return;
         }
 
         // Get the product details for each wishlisted product
         if (wishlist && wishlist.length > 0) {
-          const productIds = wishlist.map(w => w.product_id);
+          const productIds = wishlist.map((w) => w.product_id);
           const { data: products, error: productsError } = await supabase
-            .from('products')
-            .select('*')
-            .in('id', productIds);
+            .from("products")
+            .select("*")
+            .in("id", productIds);
 
           if (productsError) {
-            console.error('Error fetching products:', productsError);
+            console.error("Error fetching products:", productsError);
           } else {
             setWishlistProducts(products || []);
           }
@@ -2908,7 +4174,7 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
         }
         setWishlistLoading(false);
       } catch (err) {
-        console.error('Error fetching wishlist:', err);
+        console.error("Error fetching wishlist:", err);
         setWishlistLoading(false);
       }
     };
@@ -2925,8 +4191,12 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
        * body: { name, bio, website }
        * header: Authorization: Bearer <token>
        */
-      await new Promise(r => setTimeout(r, 900));
-      onUpdate({ name: profileForm.name, bio: profileForm.bio, website: profileForm.website });
+      await new Promise((r) => setTimeout(r, 900));
+      onUpdate({
+        name: profileForm.name,
+        bio: profileForm.bio,
+        website: profileForm.website,
+      });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2500);
     } catch {
@@ -2936,7 +4206,10 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwForm.next !== pwForm.confirm) { setPwStatus("error"); return; }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwStatus("error");
+      return;
+    }
     setPwStatus("saving");
     try {
       /*
@@ -2944,7 +4217,7 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
        * body: { currentPassword: pwForm.current, newPassword: pwForm.next }
        * header: Authorization: Bearer <token>
        */
-      await new Promise(r => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 900));
       setPwStatus("saved");
       setPwForm({ current: "", next: "", confirm: "" });
       setTimeout(() => setPwStatus("idle"), 2500);
@@ -2953,10 +4226,20 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
     }
   };
 
-  const inputClass = "w-full px-5 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
-  const initials = authUser.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+  const inputClass =
+    "w-full px-5 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+  const initials = authUser.name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
-  const tabs: { id: typeof activeTab; label: string; icon: React.ElementType }[] = [
+  const tabs: {
+    id: typeof activeTab;
+    label: string;
+    icon: React.ElementType;
+  }[] = [
     { id: "account", label: "Account", icon: User },
     { id: "library", label: "Library", icon: Package },
     { id: "wishlist", label: "Wishlist", icon: Heart },
@@ -2964,22 +4247,31 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-      className="min-h-screen pt-20 lg:pt-24">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="min-h-screen pt-20 lg:pt-24"
+    >
       <div className="max-w-5xl mx-auto px-4 lg:px-10 py-10 lg:py-14">
-
         {/* Profile header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-10 pb-10 border-b border-border">
           <div className="w-20 h-20 rounded-3xl bg-primary flex items-center justify-center text-2xl font-display font-black text-primary-foreground shrink-0">
             {initials}
           </div>
           <div className="flex-1">
-            <h1 className="text-2xl font-display font-extrabold text-foreground">{authUser.name}</h1>
+            <h1 className="text-2xl font-display font-extrabold text-foreground">
+              {authUser.name}
+            </h1>
             <p className="text-muted-foreground text-sm">{authUser.email}</p>
-            {authUser.bio && <p className="text-sm text-foreground mt-1">{authUser.bio}</p>}
+            {authUser.bio && (
+              <p className="text-sm text-foreground mt-1">{authUser.bio}</p>
+            )}
           </div>
-          <button onClick={onLogout}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors">
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+          >
             <LogOut size={14} /> Sign Out
           </button>
         </div>
@@ -2987,50 +4279,115 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
         {/* Tabs */}
         <div className="flex gap-1 mb-8 overflow-x-auto pb-1">
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${activeTab === id ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                activeTab === id
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
               <Icon size={15} />
               {label}
-              {id === "library" && <span className="text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 font-mono">{libraryProducts.length}</span>}
-              {id === "wishlist" && wishlistProducts.length > 0 && <span className="text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 font-mono">{wishlistProducts.length}</span>}
+              {id === "library" && (
+                <span className="text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 font-mono">
+                  {libraryProducts.length}
+                </span>
+              )}
+              {id === "wishlist" && wishlistProducts.length > 0 && (
+                <span className="text-xs bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 font-mono">
+                  {wishlistProducts.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Tab content */}
         <AnimatePresence mode="wait">
-
           {/* Account tab */}
           {activeTab === "account" && (
-            <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
+            <motion.div
+              key="account"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
               <form onSubmit={handleProfileSave} className="max-w-lg space-y-5">
                 <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Full Name</label>
-                  <input value={profileForm.name} onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))} required className={inputClass} />
+                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    value={profileForm.name}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, name: e.target.value }))
+                    }
+                    required
+                    className={inputClass}
+                  />
                 </div>
                 <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email</label>
-                  <input value={profileForm.email} type="email" disabled className={`${inputClass} opacity-50 cursor-not-allowed`} />
-                  <p className="text-xs text-muted-foreground mt-1.5">Email changes require verification. Contact support.</p>
+                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    Email
+                  </label>
+                  <input
+                    value={profileForm.email}
+                    type="email"
+                    disabled
+                    className={`${inputClass} opacity-50 cursor-not-allowed`}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Email changes require verification. Contact support.
+                  </p>
                 </div>
                 <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Bio</label>
-                  <textarea value={profileForm.bio} onChange={e => setProfileForm(f => ({ ...f, bio: e.target.value }))}
-                    rows={3} placeholder="Tell the community about yourself..."
-                    className={`${inputClass} resize-none`} />
+                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    Bio
+                  </label>
+                  <textarea
+                    value={profileForm.bio}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, bio: e.target.value }))
+                    }
+                    rows={3}
+                    placeholder="Tell the community about yourself..."
+                    className={`${inputClass} resize-none`}
+                  />
                 </div>
                 <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Website</label>
-                  <input value={profileForm.website} onChange={e => setProfileForm(f => ({ ...f, website: e.target.value }))}
-                    type="url" placeholder="https://yoursite.com" className={inputClass} />
+                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    Website
+                  </label>
+                  <input
+                    value={profileForm.website}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, website: e.target.value }))
+                    }
+                    type="url"
+                    placeholder="https://yoursite.com"
+                    className={inputClass}
+                  />
                 </div>
-                <button type="submit" disabled={saveStatus === "saving"}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.2)] disabled:opacity-60 transition-all duration-300">
+                <button
+                  type="submit"
+                  disabled={saveStatus === "saving"}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.2)] disabled:opacity-60 transition-all duration-300"
+                >
                   {saveStatus === "saving" ? (
-                    <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Saving...</>
+                    <>
+                      <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />{" "}
+                      Saving...
+                    </>
                   ) : saveStatus === "saved" ? (
-                    <><CheckCircle size={15} /> Saved!</>
-                  ) : "Save Changes"}
+                    <>
+                      <CheckCircle size={15} /> Saved!
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </button>
               </form>
             </motion.div>
@@ -3038,7 +4395,13 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
 
           {/* Library tab */}
           {activeTab === "library" && (
-            <motion.div key="library" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
+            <motion.div
+              key="library"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
               {libraryLoading ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
@@ -3047,21 +4410,39 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
               ) : libraryProducts.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <Package size={40} className="mx-auto mb-4 opacity-30" />
-                  <p className="font-semibold text-foreground mb-1">Your library is empty</p>
-                  <p className="text-sm">Download free resources or purchase premium kits to find them here.</p>
+                  <p className="font-semibold text-foreground mb-1">
+                    Your library is empty
+                  </p>
+                  <p className="text-sm">
+                    Download free resources or purchase premium kits to find
+                    them here.
+                  </p>
                 </div>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {libraryProducts.map(p => (
-                    <div key={p.id} onClick={() => onProductClick(p)}
-                      className="group cursor-pointer flex gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200">
-                      <img src={p.thumbnail} alt={p.title} loading="lazy"
-                        className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                  {libraryProducts.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => onProductClick(p)}
+                      className="group cursor-pointer flex gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200"
+                    >
+                      <img
+                        src={p.thumbnail}
+                        alt={p.title}
+                        loading="lazy"
+                        className="w-16 h-16 rounded-xl object-cover shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">{p.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{p.shortDescription}</p>
+                        <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                          {p.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                          {p.shortDescription}
+                        </p>
                         <div className="flex items-center gap-1 mt-2">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">Downloaded</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">
+                            Downloaded
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -3073,7 +4454,13 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
 
           {/* Wishlist tab */}
           {activeTab === "wishlist" && (
-            <motion.div key="wishlist" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
+            <motion.div
+              key="wishlist"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
               {wishlistLoading ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
@@ -3082,22 +4469,45 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
               ) : wishlistProducts.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                   <Heart size={40} className="mx-auto mb-4 opacity-30" />
-                  <p className="font-semibold text-foreground mb-1">Nothing saved yet</p>
-                  <p className="text-sm">Tap the heart icon on any resource to save it here.</p>
+                  <p className="font-semibold text-foreground mb-1">
+                    Nothing saved yet
+                  </p>
+                  <p className="text-sm">
+                    Tap the heart icon on any resource to save it here.
+                  </p>
                 </div>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {wishlistProducts.map(p => (
-                    <div key={p.id} onClick={() => onProductClick(p)}
-                      className="group cursor-pointer flex gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200">
-                      <img src={p.thumbnail} alt={p.title} loading="lazy"
-                        className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                  {wishlistProducts.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => onProductClick(p)}
+                      className="group cursor-pointer flex gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200"
+                    >
+                      <img
+                        src={p.thumbnail}
+                        alt={p.title}
+                        loading="lazy"
+                        className="w-16 h-16 rounded-xl object-cover shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">{p.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{p.isFree ? "Free" : `$${p.discountPrice ?? p.price}`}</p>
+                        <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                          {p.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {p.isFree ? "Free" : `$${p.discountPrice ?? p.price}`}
+                        </p>
                         <div className="flex items-center gap-0.5 mt-1.5">
                           {Array.from({ length: 5 }).map((_, i) => (
-                            <Star key={i} size={10} className={i < Math.round(p.rating) ? "text-primary fill-primary" : "text-border"} />
+                            <Star
+                              key={i}
+                              size={10}
+                              className={
+                                i < Math.round(p.rating)
+                                  ? "text-primary fill-primary"
+                                  : "text-border"
+                              }
+                            />
                           ))}
                         </div>
                       </div>
@@ -3110,50 +4520,118 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
 
           {/* Settings tab */}
           {activeTab === "settings" && (
-            <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }}>
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25 }}
+            >
               <div className="max-w-lg space-y-8">
-
                 {/* Change password */}
                 <div>
-                  <h3 className="text-lg font-display font-bold text-foreground mb-5">Change Password</h3>
+                  <h3 className="text-lg font-display font-bold text-foreground mb-5">
+                    Change Password
+                  </h3>
                   <form onSubmit={handlePasswordChange} className="space-y-4">
                     <div>
-                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Current Password</label>
-                      <input type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} required className={inputClass} />
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        value={pwForm.current}
+                        onChange={(e) =>
+                          setPwForm((f) => ({ ...f, current: e.target.value }))
+                        }
+                        required
+                        className={inputClass}
+                      />
                     </div>
                     <div>
-                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">New Password</label>
-                      <input type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} required minLength={6} className={inputClass} />
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                        New Password
+                      </label>
+                      <input
+                        type="password"
+                        value={pwForm.next}
+                        onChange={(e) =>
+                          setPwForm((f) => ({ ...f, next: e.target.value }))
+                        }
+                        required
+                        minLength={6}
+                        className={inputClass}
+                      />
                     </div>
                     <div>
-                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Confirm New Password</label>
-                      <input type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} required className={inputClass} />
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                        Confirm New Password
+                      </label>
+                      <input
+                        type="password"
+                        value={pwForm.confirm}
+                        onChange={(e) =>
+                          setPwForm((f) => ({ ...f, confirm: e.target.value }))
+                        }
+                        required
+                        className={inputClass}
+                      />
                     </div>
                     {pwStatus === "error" && (
                       <p className="text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3 flex items-center gap-2">
-                        <AlertCircle size={14} /> Passwords do not match or current password is wrong.
+                        <AlertCircle size={14} /> Passwords do not match or
+                        current password is wrong.
                       </p>
                     )}
-                    <button type="submit" disabled={pwStatus === "saving"}
-                      className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all duration-300">
-                      {pwStatus === "saving" ? "Updating..." : pwStatus === "saved" ? <><CheckCircle size={15} /> Updated!</> : "Update Password"}
+                    <button
+                      type="submit"
+                      disabled={pwStatus === "saving"}
+                      className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all duration-300"
+                    >
+                      {pwStatus === "saving" ? (
+                        "Updating..."
+                      ) : pwStatus === "saved" ? (
+                        <>
+                          <CheckCircle size={15} /> Updated!
+                        </>
+                      ) : (
+                        "Update Password"
+                      )}
                     </button>
                   </form>
                 </div>
 
                 {/* Notifications */}
                 <div className="pt-6 border-t border-border">
-                  <h3 className="text-lg font-display font-bold text-foreground mb-4">Notifications</h3>
+                  <h3 className="text-lg font-display font-bold text-foreground mb-4">
+                    Notifications
+                  </h3>
                   {/* TODO: GET/PUT ${API_BASE}/auth/notifications-preferences */}
                   {[
-                    { label: "New resources in saved categories", sub: "Get notified when new items are added" },
-                    { label: "Promotions & discounts", sub: "Sales, limited offers, and bundles" },
-                    { label: "Purchase confirmations", sub: "Email receipt after every purchase" },
+                    {
+                      label: "New resources in saved categories",
+                      sub: "Get notified when new items are added",
+                    },
+                    {
+                      label: "Promotions & discounts",
+                      sub: "Sales, limited offers, and bundles",
+                    },
+                    {
+                      label: "Purchase confirmations",
+                      sub: "Email receipt after every purchase",
+                    },
                   ].map(({ label, sub }) => (
-                    <div key={label} className="flex items-start justify-between gap-4 py-4 border-b border-border/50 last:border-0">
+                    <div
+                      key={label}
+                      className="flex items-start justify-between gap-4 py-4 border-b border-border/50 last:border-0"
+                    >
                       <div>
-                        <p className="text-sm font-medium text-foreground">{label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {label}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {sub}
+                        </p>
                       </div>
                       {/* Toggle – wire to backend preference update */}
                       <button className="w-11 h-6 bg-primary rounded-full relative transition-colors shrink-0">
@@ -3165,8 +4643,12 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
 
                 {/* Danger zone */}
                 <div className="pt-6 border-t border-border">
-                  <h3 className="text-lg font-display font-bold text-destructive mb-2">Danger Zone</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Deleting your account is permanent and cannot be undone.</p>
+                  <h3 className="text-lg font-display font-bold text-destructive mb-2">
+                    Danger Zone
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Deleting your account is permanent and cannot be undone.
+                  </p>
                   {/* TODO: DELETE ${API_BASE}/auth/account (requires password confirmation) */}
                   <button className="px-5 py-2.5 rounded-xl border border-destructive/30 text-destructive-foreground bg-destructive/10 text-sm font-medium hover:bg-destructive/20 transition-colors">
                     Delete Account
@@ -3175,7 +4657,6 @@ function ProfilePage({ authUser, onUpdate, onLogout, onProductClick }: {
               </div>
             </motion.div>
           )}
-
         </AnimatePresence>
       </div>
     </motion.div>
@@ -3189,20 +4670,31 @@ function PublisherPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
   const [form, setForm] = useState({
-    name: "", email: "", portfolio: "", social: "",
-    experience: "", categories: [] as string[], message: "",
+    name: "",
+    email: "",
+    portfolio: "",
+    social: "",
+    experience: "",
+    categories: [] as string[],
+    message: "",
   });
-const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | "check_email" | "reset_success">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error" | "check_email" | "reset_success"
+  >("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   };
 
   const toggleCategory = (cat: string) => {
-    setForm(f => ({
+    setForm((f) => ({
       ...f,
       categories: f.categories.includes(cat)
-        ? f.categories.filter(c => c !== cat)
+        ? f.categories.filter((c) => c !== cat)
         : [...f.categories, cat],
     }));
   };
@@ -3222,7 +4714,7 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
         message: form.message || null,
         status: "pending",
       });
-  
+
       if (error) {
         if (error.code === "23505") {
           setStatus("error");
@@ -3232,7 +4724,7 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
         }
         throw error;
       }
-  
+
       setStatus("success");
     } catch (err: any) {
       console.error("Publisher application error:", err);
@@ -3269,38 +4761,64 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
 
   const steps = [
     {
-      n: "01", title: "Apply with Your Portfolio",
+      n: "01",
+      title: "Apply with Your Portfolio",
       desc: "Fill out the form below with links to your best Figma work. We look for quality, consistency, and a clear design voice.",
     },
     {
-      n: "02", title: "We Review Within 48 Hours",
+      n: "02",
+      title: "We Review Within 48 Hours",
       desc: "Our curation team reviews every application personally. You'll hear back with feedback regardless of the outcome.",
     },
     {
-      n: "03", title: "Start Publishing",
+      n: "03",
+      title: "Start Publishing",
       desc: "Once approved, get access to the publisher dashboard and start uploading your first resource today.",
     },
   ];
 
-  const resourceCategories = ["UI Kits", "Landing Page Templates", "Design Systems", "Wireframe Kits", "Icon Packs", "Device Mockups", "UX Flow Diagrams", "3D Assets"];
+  const resourceCategories = [
+    "UI Kits",
+    "Landing Page Templates",
+    "Design Systems",
+    "Wireframe Kits",
+    "Icon Packs",
+    "Device Mockups",
+    "UX Flow Diagrams",
+    "3D Assets",
+  ];
 
-  const inputClass = "w-full px-5 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+  const inputClass =
+    "w-full px-5 py-3.5 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-      className="min-h-screen pt-20">
-
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="min-h-screen pt-20"
+    >
       {/* Hero */}
       <section className="relative py-24 lg:py-32 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full blur-[140px] bg-[#aaff38]/5 dark:bg-[#aaff38]/6" />
-          <div className="absolute inset-0 opacity-[0.025]"
-            style={{ backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+          <div
+            className="absolute inset-0 opacity-[0.025]"
+            style={{
+              backgroundImage:
+                "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
+              backgroundSize: "60px 60px",
+            }}
+          />
         </div>
 
         <div className="max-w-4xl mx-auto px-6 lg:px-10 text-center relative">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8"
+          >
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             Now Accepting Publisher Applications
           </motion.div>
@@ -3308,28 +4826,53 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
           {["Publish Your", "Designs.", "Reach Thousands."].map((line, i) => (
             <div key={line} className="overflow-hidden">
               <motion.h1
-                initial={{ y: 100 }} animate={{ y: 0 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.1 * i }}
-                className={`text-5xl md:text-7xl lg:text-8xl font-display font-extrabold leading-[0.92] tracking-tight ${i === 1 ? "text-primary" : "text-foreground"}`}>
+                initial={{ y: 100 }}
+                animate={{ y: 0 }}
+                transition={{
+                  duration: 0.8,
+                  ease: [0.16, 1, 0.3, 1],
+                  delay: 0.1 * i,
+                }}
+                className={`text-5xl md:text-7xl lg:text-8xl font-display font-extrabold leading-[0.92] tracking-tight ${
+                  i === 1 ? "text-primary" : "text-foreground"
+                }`}
+              >
                 {line}
               </motion.h1>
             </div>
           ))}
 
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.45 }}
-            className="mt-8 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Join Layerat as a publisher and put your Figma resources — UI kits, templates, icon packs, and design systems — in front of a global community of designers.
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.45 }}
+            className="mt-8 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed"
+          >
+            Join Layerat as a publisher and put your Figma resources — UI kits,
+            templates, icon packs, and design systems — in front of a global
+            community of designers.
           </motion.p>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.55 }}
-            className="flex flex-wrap gap-4 justify-center mt-10">
-            <a href="#apply"
-              className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.55 }}
+            className="flex flex-wrap gap-4 justify-center mt-10"
+          >
+            <a
+              href="#apply"
+              className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300"
+            >
               Apply Now
-              <ArrowUpRight size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              <ArrowUpRight
+                size={18}
+                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+              />
             </a>
-            <button onClick={() => onNavigate("about")}
-              className="flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300">
+            <button
+              onClick={() => onNavigate("about")}
+              className="flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+            >
               Learn About Us
             </button>
           </motion.div>
@@ -3339,31 +4882,61 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
       {/* Benefits */}
       <section ref={ref} className="py-24 bg-muted/20 border-y border-border">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5 }}
-            className="text-center mb-16">
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">Why Publish with Us</span>
-            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">Everything a creator needs</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-16"
+          >
+            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+              Why Publish with Us
+            </span>
+            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
+              Everything a creator needs
+            </h2>
           </motion.div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {benefits.map(({ icon: Icon, title, desc, color }, i) => (
-              <TiltCard key={title} className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_6px_32px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_50px_rgba(82,51,253,0.12)] relative overflow-hidden">
+              <TiltCard
+                key={title}
+                className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_6px_32px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_50px_rgba(82,51,253,0.12)] relative overflow-hidden"
+              >
                 <motion.div
-                  initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-7">
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                    style={{ background: `radial-gradient(ellipse at top left, ${color}06 0%, transparent 70%)` }} />
+                  className="p-7"
+                >
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at top left, ${color}06 0%, transparent 70%)`,
+                    }}
+                  />
                   <div className="relative">
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300"
-                      style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
+                    <div
+                      className="w-11 h-11 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300"
+                      style={{
+                        background: `${color}18`,
+                        border: `1px solid ${color}30`,
+                      }}
+                    >
                       <Icon size={20} style={{ color }} />
                     </div>
-                    <h3 className="text-base font-display font-bold text-foreground mb-2">{title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                    <h3 className="text-base font-display font-bold text-foreground mb-2">
+                      {title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {desc}
+                    </p>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                    style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+                    }}
+                  />
                 </motion.div>
               </TiltCard>
             ))}
@@ -3375,18 +4948,32 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
       <section className="py-24 lg:py-32">
         <div className="max-w-5xl mx-auto px-6 lg:px-10">
           <div className="text-center mb-16">
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">The Process</span>
-            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">How to join</h2>
+            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+              The Process
+            </span>
+            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
+              How to join
+            </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {steps.map(({ n, title, desc }, i) => (
-              <motion.div key={n}
-                initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="relative">
-                <div className="text-7xl font-display font-black text-primary/10 leading-none mb-4 select-none">{n}</div>
-                <h3 className="text-xl font-display font-bold text-foreground mb-3">{title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
+              <motion.div
+                key={n}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.12 }}
+                className="relative"
+              >
+                <div className="text-7xl font-display font-black text-primary/10 leading-none mb-4 select-none">
+                  {n}
+                </div>
+                <h3 className="text-xl font-display font-bold text-foreground mb-3">
+                  {title}
+                </h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {desc}
+                </p>
                 {i < steps.length - 1 && (
                   <div className="hidden md:block absolute top-8 left-full w-8 h-px bg-border -translate-x-4" />
                 )}
@@ -3401,10 +4988,17 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
         <div className="max-w-5xl mx-auto px-6 lg:px-10">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">Requirements</span>
-              <h2 className="mt-4 text-3xl font-display font-extrabold text-foreground mb-6">Who should apply?</h2>
+              <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+                Requirements
+              </span>
+              <h2 className="mt-4 text-3xl font-display font-extrabold text-foreground mb-6">
+                Who should apply?
+              </h2>
               <p className="text-muted-foreground leading-relaxed mb-8">
-                We welcome designers of all backgrounds — freelancers, agency designers, and in-house teams. The key is that your resources are crafted with care and solve real problems for other designers.
+                We welcome designers of all backgrounds — freelancers, agency
+                designers, and in-house teams. The key is that your resources
+                are crafted with care and solve real problems for other
+                designers.
               </p>
               <ul className="space-y-3">
                 {[
@@ -3413,8 +5007,11 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
                   "Resources built with Auto Layout best practices",
                   "Commitment to maintaining and updating your files",
                   "Original work — no copied or repackaged resources",
-                ].map(req => (
-                  <li key={req} className="flex items-start gap-3 text-sm text-muted-foreground">
+                ].map((req) => (
+                  <li
+                    key={req}
+                    className="flex items-start gap-3 text-sm text-muted-foreground"
+                  >
                     <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                       <Check size={11} className="text-primary" />
                     </div>
@@ -3425,13 +5022,24 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: "Free to Apply", sub: "No listing fees or upfront costs" },
+                {
+                  label: "Free to Apply",
+                  sub: "No listing fees or upfront costs",
+                },
                 { label: "Fast Review", sub: "Decisions within 48 hours" },
-                { label: "Easy Upload", sub: "Drag-and-drop publisher dashboard" },
+                {
+                  label: "Easy Upload",
+                  sub: "Drag-and-drop publisher dashboard",
+                },
                 { label: "Full Control", sub: "Update your files anytime" },
               ].map(({ label, sub }) => (
-                <div key={label} className="p-5 rounded-2xl border border-border bg-card hover:border-primary/30 transition-colors duration-200">
-                  <div className="text-base font-display font-bold text-foreground mb-1">{label}</div>
+                <div
+                  key={label}
+                  className="p-5 rounded-2xl border border-border bg-card hover:border-primary/30 transition-colors duration-200"
+                >
+                  <div className="text-base font-display font-bold text-foreground mb-1">
+                    {label}
+                  </div>
                   <div className="text-xs text-muted-foreground">{sub}</div>
                 </div>
               ))}
@@ -3444,59 +5052,119 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
       <section id="apply" className="py-24 lg:py-32">
         <div className="max-w-2xl mx-auto px-6 lg:px-10">
           <div className="text-center mb-12">
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">Apply</span>
-            <h2 className="mt-4 text-4xl font-display font-extrabold text-foreground">Start your application</h2>
+            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+              Apply
+            </span>
+            <h2 className="mt-4 text-4xl font-display font-extrabold text-foreground">
+              Start your application
+            </h2>
             <p className="mt-4 text-muted-foreground">
               Takes about 5 minutes. We read every application personally.
             </p>
           </div>
 
           {status === "success" ? (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-16 px-8 rounded-3xl border border-primary/20 bg-primary/5">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-16 px-8 rounded-3xl border border-primary/20 bg-primary/5"
+            >
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={28} className="text-primary" />
               </div>
-              <h3 className="text-2xl font-display font-bold text-foreground mb-3">Application Received!</h3>
+              <h3 className="text-2xl font-display font-bold text-foreground mb-3">
+                Application Received!
+              </h3>
               <p className="text-muted-foreground mb-2">
-                Thanks for applying to become a Layerat publisher. We'll review your portfolio and get back to you within 48 hours.
+                Thanks for applying to become a Layerat publisher. We'll review
+                your portfolio and get back to you within 48 hours.
               </p>
-              <p className="text-sm text-muted-foreground">Check your inbox at <span className="text-primary font-mono">{form.email}</span></p>
-              <button onClick={() => onNavigate("home")}
-                className="mt-8 px-8 py-3 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity">
+              <p className="text-sm text-muted-foreground">
+                Check your inbox at{" "}
+                <span className="text-primary font-mono">{form.email}</span>
+              </p>
+              <button
+                onClick={() => onNavigate("home")}
+                className="mt-8 px-8 py-3 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity"
+              >
                 Back to Marketplace
               </button>
             </motion.div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5 bg-card border border-border rounded-3xl p-8">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 bg-card border border-border rounded-3xl p-8"
+            >
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Full Name *</label>
-                  <input name="name" value={form.name} onChange={handleChange} required
-                    placeholder="Your name" className={inputClass} />
+                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    Full Name *
+                  </label>
+                  <input
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    required
+                    placeholder="Your name"
+                    className={inputClass}
+                  />
                 </div>
                 <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Email *</label>
-                  <input name="email" type="email" value={form.email} onChange={handleChange} required
-                    placeholder="you@example.com" className={inputClass} />
+                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    Email *
+                  </label>
+                  <input
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    required
+                    placeholder="you@example.com"
+                    className={inputClass}
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Portfolio / Figma Community URL *</label>
-                <input name="portfolio" value={form.portfolio} onChange={handleChange} required type="text"
-                  placeholder="https://www.figma.com/@yourprofile" className={inputClass} />
+                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                  Portfolio / Figma Community URL *
+                </label>
+                <input
+                  name="portfolio"
+                  value={form.portfolio}
+                  onChange={handleChange}
+                  required
+                  type="text"
+                  placeholder="https://www.figma.com/@yourprofile"
+                  className={inputClass}
+                />
               </div>
 
               <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Dribbble / Behance / Personal Site</label>
-                <input name="social" value={form.social} onChange={handleChange} type="text"
-                  placeholder="https://dribbble.com/yourprofile" className={inputClass} />
+                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                  Dribbble / Behance / Personal Site
+                </label>
+                <input
+                  name="social"
+                  value={form.social}
+                  onChange={handleChange}
+                  type="text"
+                  placeholder="https://dribbble.com/yourprofile"
+                  className={inputClass}
+                />
               </div>
 
               <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Years of Figma Experience *</label>
-                <select name="experience" value={form.experience} onChange={handleChange} required className={inputClass}>
+                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                  Years of Figma Experience *
+                </label>
+                <select
+                  name="experience"
+                  value={form.experience}
+                  onChange={handleChange}
+                  required
+                  className={inputClass}
+                >
                   <option value="">Select experience level</option>
                   <option value="1-2">1–2 years</option>
                   <option value="3-4">3–4 years</option>
@@ -3505,13 +5173,24 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
               </div>
 
               <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-3">What type of resources will you publish? *</label>
+                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-3">
+                  What type of resources will you publish? *
+                </label>
                 <div className="flex flex-wrap gap-2">
-                  {resourceCategories.map(cat => (
-                    <button key={cat} type="button"
+                  {resourceCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
                       onClick={() => toggleCategory(cat)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-200 ${form.categories.includes(cat) ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground bg-card"}`}>
-                      {form.categories.includes(cat) && <Check size={11} className="inline mr-1" />}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-200 ${
+                        form.categories.includes(cat)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground bg-card"
+                      }`}
+                    >
+                      {form.categories.includes(cat) && (
+                        <Check size={11} className="inline mr-1" />
+                      )}
                       {cat}
                     </button>
                   ))}
@@ -3519,10 +5198,18 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
               </div>
 
               <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Tell Us About Your Work *</label>
-                <textarea name="message" value={form.message} onChange={handleChange} required rows={4}
+                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                  Tell Us About Your Work *
+                </label>
+                <textarea
+                  name="message"
+                  value={form.message}
+                  onChange={handleChange}
+                  required
+                  rows={4}
                   placeholder="Describe the kind of resources you plan to publish, your design process, and what makes your work stand out..."
-                  className={`${inputClass} resize-none`} />
+                  className={`${inputClass} resize-none`}
+                />
               </div>
 
               {status === "error" && (
@@ -3532,16 +5219,26 @@ const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | 
                 </div>
               )}
 
-              <button type="submit" disabled={status === "loading" || form.categories.length === 0}
-                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300">
+              <button
+                type="submit"
+                disabled={status === "loading" || form.categories.length === 0}
+                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300"
+              >
                 {status === "loading" ? (
-                  <><span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Submitting...</>
+                  <>
+                    <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />{" "}
+                    Submitting...
+                  </>
                 ) : (
-                  <><Send size={16} /> Submit Application</>
+                  <>
+                    <Send size={16} /> Submit Application
+                  </>
                 )}
               </button>
               <p className="text-xs text-muted-foreground text-center">
-                By applying you agree to our Publisher Terms of Service. We respect your portfolio — it will only be reviewed by the Layerat team.
+                By applying you agree to our Publisher Terms of Service. We
+                respect your portfolio — it will only be reviewed by the Layerat
+                team.
               </p>
             </form>
           )}
@@ -3569,7 +5266,10 @@ const TEAM_MEMBERS: TeamMember[] = [
     bio: "10 years of UX expertise spanning enterprise SaaS, government platforms, and design systems. Yazeed leads the design direction and quality standards for every resource on the platform.",
     initials: "YH",
     color: "#aaff38",
-    links: [{ label: "Portfolio", url: "#" }, { label: "Figma", url: "#" }],
+    links: [
+      { label: "Portfolio", url: "#" },
+      { label: "Figma", url: "#" },
+    ],
   },
   {
     name: "Rima Saleh",
@@ -3577,7 +5277,10 @@ const TEAM_MEMBERS: TeamMember[] = [
     bio: "Rima reviews every resource submission personally and works with publishers to raise the quality bar. Her background spans agency design and product design at scale.",
     initials: "RS",
     color: "#60a5fa",
-    links: [{ label: "Dribbble", url: "#" }, { label: "LinkedIn", url: "#" }],
+    links: [
+      { label: "Dribbble", url: "#" },
+      { label: "LinkedIn", url: "#" },
+    ],
   },
   {
     name: "Khalid Nasser",
@@ -3593,7 +5296,10 @@ const TEAM_MEMBERS: TeamMember[] = [
     bio: "Nour shapes our understanding of what the design community needs. She leads user research, curates the free resources library, and keeps the community healthy and growing.",
     initials: "NA",
     color: "#c084fc",
-    links: [{ label: "LinkedIn", url: "#" }, { label: "Website", url: "#" }],
+    links: [
+      { label: "LinkedIn", url: "#" },
+      { label: "Website", url: "#" },
+    ],
   },
   {
     name: "Tariq Ramadan",
@@ -3618,38 +5324,77 @@ function TeamPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
   const values = [
-    { icon: Award, label: "Craft First", desc: "We obsess over quality so our users don't have to second-guess what they download." },
-    { icon: Users, label: "Community Driven", desc: "Every decision is shaped by the designers who use the platform daily." },
-    { icon: Globe, label: "Open by Default", desc: "A meaningful portion of our library will always be free for the community." },
-    { icon: Zap, label: "Ship Fast", desc: "We move quickly, iterate based on feedback, and never wait for perfect." },
+    {
+      icon: Award,
+      label: "Craft First",
+      desc: "We obsess over quality so our users don't have to second-guess what they download.",
+    },
+    {
+      icon: Users,
+      label: "Community Driven",
+      desc: "Every decision is shaped by the designers who use the platform daily.",
+    },
+    {
+      icon: Globe,
+      label: "Open by Default",
+      desc: "A meaningful portion of our library will always be free for the community.",
+    },
+    {
+      icon: Zap,
+      label: "Ship Fast",
+      desc: "We move quickly, iterate based on feedback, and never wait for perfect.",
+    },
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-      className="min-h-screen pt-20">
-
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="min-h-screen pt-20"
+    >
       {/* Hero */}
       <section className="relative py-24 lg:py-32 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full blur-[130px] bg-[#aaff38]/5 dark:bg-[#aaff38]/6" />
-          <div className="absolute inset-0 opacity-[0.025]"
-            style={{ backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+          <div
+            className="absolute inset-0 opacity-[0.025]"
+            style={{
+              backgroundImage:
+                "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
+              backgroundSize: "60px 60px",
+            }}
+          />
         </div>
         <div className="max-w-4xl mx-auto px-6 lg:px-10 text-center relative">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8"
+          >
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             The People Behind Layerat
           </motion.div>
           <div className="overflow-hidden mb-2">
-            <motion.h1 initial={{ y: 100 }} animate={{ y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="text-6xl md:text-8xl font-display font-extrabold leading-[0.9] tracking-tight text-foreground">
+            <motion.h1
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="text-6xl md:text-8xl font-display font-extrabold leading-[0.9] tracking-tight text-foreground"
+            >
               Our Team
             </motion.h1>
           </div>
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.35 }}
-            className="mt-8 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            A small, focused team of designers, builders, and community-lovers on a mission to make great Figma resources accessible to every designer on earth.
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.35 }}
+            className="mt-8 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed"
+          >
+            A small, focused team of designers, builders, and community-lovers
+            on a mission to make great Figma resources accessible to every
+            designer on earth.
           </motion.p>
         </div>
       </section>
@@ -3659,31 +5404,55 @@ function TeamPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {TEAM_MEMBERS.map((member, i) => (
-              <TiltCard key={member.name} className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_60px_rgba(82,51,253,0.12)] relative overflow-hidden">
+              <TiltCard
+                key={member.name}
+                className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_0_60px_rgba(82,51,253,0.12)] relative overflow-hidden"
+              >
                 <motion.div
-                  initial={{ opacity: 0, y: 40 }} animate={inView ? { opacity: 1, y: 0 } : {}}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.55, delay: i * 0.1 }}
-                  className="p-7">
+                  className="p-7"
+                >
                   {/* Glow */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                    style={{ background: `radial-gradient(ellipse at top left, ${member.color}07 0%, transparent 70%)` }} />
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at top left, ${member.color}07 0%, transparent 70%)`,
+                    }}
+                  />
 
                   <div className="relative">
                     {/* Avatar */}
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-display font-black mb-5 transition-transform duration-300 group-hover:scale-105"
-                      style={{ background: `${member.color}20`, color: member.color, border: `2px solid ${member.color}30` }}>
+                    <div
+                      className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-display font-black mb-5 transition-transform duration-300 group-hover:scale-105"
+                      style={{
+                        background: `${member.color}20`,
+                        color: member.color,
+                        border: `2px solid ${member.color}30`,
+                      }}
+                    >
                       {member.initials}
                     </div>
 
-                    <h3 className="text-lg font-display font-bold text-foreground mb-0.5">{member.name}</h3>
-                    <p className="text-xs font-mono text-primary mb-4">{member.role}</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-5">{member.bio}</p>
+                    <h3 className="text-lg font-display font-bold text-foreground mb-0.5">
+                      {member.name}
+                    </h3>
+                    <p className="text-xs font-mono text-primary mb-4">
+                      {member.role}
+                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-5">
+                      {member.bio}
+                    </p>
 
                     {/* Links */}
                     <div className="flex flex-wrap gap-2">
-                      {member.links.map(link => (
-                        <a key={link.label} href={link.url}
-                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-all duration-200">
+                      {member.links.map((link) => (
+                        <a
+                          key={link.label}
+                          href={link.url}
+                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-all duration-200"
+                        >
                           <ExternalLink size={11} />
                           {link.label}
                         </a>
@@ -3692,8 +5461,12 @@ function TeamPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   </div>
 
                   {/* Bottom accent */}
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                    style={{ background: `linear-gradient(90deg, transparent, ${member.color}, transparent)` }} />
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${member.color}, transparent)`,
+                    }}
+                  />
                 </motion.div>
               </TiltCard>
             ))}
@@ -3705,20 +5478,32 @@ function TeamPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       <section className="py-24 border-y border-border bg-muted/20">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="text-center mb-14">
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">How We Work</span>
-            <h2 className="mt-4 text-4xl font-display font-extrabold text-foreground">Our values</h2>
+            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+              How We Work
+            </span>
+            <h2 className="mt-4 text-4xl font-display font-extrabold text-foreground">
+              Our values
+            </h2>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {values.map(({ icon: Icon, label, desc }, i) => (
-              <motion.div key={label}
-                initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="p-6 rounded-3xl border border-border bg-card hover:border-primary/30 transition-colors duration-300">
+              <motion.div
+                key={label}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="p-6 rounded-3xl border border-border bg-card hover:border-primary/30 transition-colors duration-300"
+              >
                 <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
                   <Icon size={18} className="text-primary" />
                 </div>
-                <h3 className="text-base font-display font-bold text-foreground mb-2">{label}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                <h3 className="text-base font-display font-bold text-foreground mb-2">
+                  {label}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {desc}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -3732,12 +5517,19 @@ function TeamPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             Want to join the team?
           </h2>
           <p className="text-muted-foreground mb-8 leading-relaxed">
-            {"We're"} a remote-first team. If you are passionate about design tooling and want to help build the marketplace for the next generation of designers — {"we'd"} love to hear from you.
+            {"We're"} a remote-first team. If you are passionate about design
+            tooling and want to help build the marketplace for the next
+            generation of designers — {"we'd"} love to hear from you.
           </p>
-          <button onClick={() => onNavigate("publisher")}
-            className="group inline-flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300">
+          <button
+            onClick={() => onNavigate("publisher")}
+            className="group inline-flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300"
+          >
             Publish With Us
-            <ArrowUpRight size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            <ArrowUpRight
+              size={18}
+              className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+            />
           </button>
         </div>
       </section>
@@ -3754,56 +5546,101 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const storyInView = useInView(storyRef, { once: true, margin: "-80px" });
 
   const stats: StatDef[] = [
-    { value: 500, suffix: "+", label: "Free Resources", icon: Package, delay: 0 },
+    {
+      value: 500,
+      suffix: "+",
+      label: "Free Resources",
+      icon: Package,
+      delay: 0,
+    },
     { value: 50, suffix: "K+", label: "Downloads", icon: Download, delay: 1 },
     { value: 12, suffix: "K+", label: "Designers", icon: Users, delay: 2 },
-    { value: 4, suffix: " Yrs", label: "Community Built", icon: Clock, delay: 3 },
+    {
+      value: 4,
+      suffix: " Yrs",
+      label: "Community Built",
+      icon: Clock,
+      delay: 3,
+    },
   ];
 
   const milestones = [
-    { year: "2021", title: "The Idea", desc: "Frustrated by scattered, low-quality Figma resources, our founders decided to build the marketplace they always wished existed." },
-    { year: "2022", title: "First Resources", desc: "Launched with 50 hand-crafted resources across UI Kits and design systems. Our community grew to 1,000 designers in the first 3 months." },
-    { year: "2023", title: "Publisher Program", desc: "Opened the platform to external publishers, giving talented designers a home to share their work with a global audience." },
-    { year: "2024", title: "50K Downloads", desc: "Crossed 50,000 total resource downloads and welcomed our 10,000th community member. Still free, still growing." },
+    {
+      year: "2021",
+      title: "The Idea",
+      desc: "Frustrated by scattered, low-quality Figma resources, our founders decided to build the marketplace they always wished existed.",
+    },
+    {
+      year: "2022",
+      title: "First Resources",
+      desc: "Launched with 50 hand-crafted resources across UI Kits and design systems. Our community grew to 1,000 designers in the first 3 months.",
+    },
+    {
+      year: "2023",
+      title: "Publisher Program",
+      desc: "Opened the platform to external publishers, giving talented designers a home to share their work with a global audience.",
+    },
+    {
+      year: "2024",
+      title: "50K Downloads",
+      desc: "Crossed 50,000 total resource downloads and welcomed our 10,000th community member. Still free, still growing.",
+    },
   ];
 
   const principles = [
     {
-      icon: Award, color: "#aaff38",
+      icon: Award,
+      color: "#aaff38",
       title: "Quality Over Quantity",
       desc: "Every resource is reviewed by our team before it goes live. We would rather have 100 exceptional resources than 10,000 mediocre ones. Quality is non-negotiable.",
     },
     {
-      icon: Users, color: "#60a5fa",
+      icon: Users,
+      color: "#60a5fa",
       title: "Designer-First",
       desc: "Every feature, every policy, every decision starts with one question: is this good for the designers using our platform? We are designers building for designers.",
     },
     {
-      icon: Globe, color: "#f59e0b",
+      icon: Globe,
+      color: "#f59e0b",
       title: "Open Community",
       desc: "A meaningful share of our library will always be completely free. Great design tools should be accessible regardless of budget or geography.",
     },
     {
-      icon: Shield, color: "#c084fc",
+      icon: Shield,
+      color: "#c084fc",
       title: "Trust & Transparency",
       desc: "Clear licensing, honest file descriptions, and no dark patterns. We build trust with our community by being straightforward about everything we do.",
     },
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}
-      className="min-h-screen pt-20">
-
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="min-h-screen pt-20"
+    >
       {/* Hero */}
       <section className="relative py-24 lg:py-36 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full blur-[140px] bg-[#aaff38]/5 dark:bg-[#aaff38]/6" />
-          <div className="absolute inset-0 opacity-[0.025]"
-            style={{ backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+          <div
+            className="absolute inset-0 opacity-[0.025]"
+            style={{
+              backgroundImage:
+                "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
+              backgroundSize: "60px 60px",
+            }}
+          />
         </div>
         <div className="max-w-5xl mx-auto px-6 lg:px-10 relative">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-mono font-medium mb-8"
+          >
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             Our Story
           </motion.div>
@@ -3811,17 +5648,31 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           {["About", "Layerat."].map((word, i) => (
             <div key={word} className="overflow-hidden">
               <motion.h1
-                initial={{ y: 100 }} animate={{ y: 0 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.1 * i }}
-                className={`text-6xl md:text-8xl font-display font-extrabold leading-[0.9] tracking-tight ${i === 1 ? "text-primary" : "text-foreground"}`}>
+                initial={{ y: 100 }}
+                animate={{ y: 0 }}
+                transition={{
+                  duration: 0.8,
+                  ease: [0.16, 1, 0.3, 1],
+                  delay: 0.1 * i,
+                }}
+                className={`text-6xl md:text-8xl font-display font-extrabold leading-[0.9] tracking-tight ${
+                  i === 1 ? "text-primary" : "text-foreground"
+                }`}
+              >
                 {word}
               </motion.h1>
             </div>
           ))}
 
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.35 }}
-            className="mt-8 text-xl text-muted-foreground max-w-2xl leading-relaxed">
-            We are a design-first studio on a mission to give every UX/UI designer on earth access to the best Figma resources — without compromise.
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.35 }}
+            className="mt-8 text-xl text-muted-foreground max-w-2xl leading-relaxed"
+          >
+            We are a design-first studio on a mission to give every UX/UI
+            designer on earth access to the best Figma resources — without
+            compromise.
           </motion.p>
         </div>
       </section>
@@ -3830,7 +5681,9 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       <section ref={statsRef} className="py-20 border-y border-border">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-4">
-            {stats.map(s => <StatItem key={s.label} {...s} inView={statsInView} />)}
+            {stats.map((s) => (
+              <StatItem key={s.label} {...s} inView={statsInView} />
+            ))}
           </div>
         </div>
       </section>
@@ -3839,43 +5692,77 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       <section ref={storyRef} className="py-24 lg:py-32">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
-            <motion.div initial={{ opacity: 0, x: -30 }} animate={storyInView ? { opacity: 1, x: 0 } : {}} transition={{ duration: 0.6 }}>
-              <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">Our Mission</span>
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={storyInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.6 }}
+            >
+              <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+                Our Mission
+              </span>
               <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground leading-tight">
                 Great design tools should be accessible to everyone
               </h2>
               <p className="mt-6 text-muted-foreground leading-relaxed">
-                Layerat was born from a simple frustration: great Figma resources were scattered, inconsistently quality-checked, and hard to trust. We set out to build the destination every UX/UI designer deserves — a curated, community-driven marketplace where you can find tools that actually ship.
+                Layerat was born from a simple frustration: great Figma
+                resources were scattered, inconsistently quality-checked, and
+                hard to trust. We set out to build the destination every UX/UI
+                designer deserves — a curated, community-driven marketplace
+                where you can find tools that actually ship.
               </p>
               <p className="mt-4 text-muted-foreground leading-relaxed">
-                We partner with talented designers worldwide — from independent freelancers to agency teams — to bring you resources that reflect real-world design challenges and modern Figma best practices.
+                We partner with talented designers worldwide — from independent
+                freelancers to agency teams — to bring you resources that
+                reflect real-world design challenges and modern Figma best
+                practices.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
-                <button onClick={() => onNavigate("browse")}
-                  className="group flex items-center gap-3 px-6 py-3.5 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.25)] transition-all duration-300">
-                  Browse Resources <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                <button
+                  onClick={() => onNavigate("browse")}
+                  className="group flex items-center gap-3 px-6 py-3.5 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.25)] transition-all duration-300"
+                >
+                  Browse Resources{" "}
+                  <ArrowUpRight
+                    size={15}
+                    className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+                  />
                 </button>
-                <button onClick={() => onNavigate("team")}
-                  className="flex items-center gap-3 px-6 py-3.5 rounded-full border border-border text-foreground font-semibold text-sm hover:border-primary/40 hover:bg-primary/5 transition-all duration-300">
+                <button
+                  onClick={() => onNavigate("team")}
+                  className="flex items-center gap-3 px-6 py-3.5 rounded-full border border-border text-foreground font-semibold text-sm hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+                >
                   Meet the Team
                 </button>
               </div>
             </motion.div>
 
             {/* Milestones */}
-            <motion.div initial={{ opacity: 0, x: 30 }} animate={storyInView ? { opacity: 1, x: 0 } : {}} transition={{ duration: 0.6, delay: 0.1 }}
-              className="relative pl-8">
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={storyInView ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="relative pl-8"
+            >
               <div className="absolute left-0 top-2 bottom-2 w-px bg-border" />
               <div className="space-y-8">
                 {milestones.map((m, i) => (
-                  <motion.div key={m.year}
-                    initial={{ opacity: 0, x: 20 }} animate={storyInView ? { opacity: 1, x: 0 } : {}}
+                  <motion.div
+                    key={m.year}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={storyInView ? { opacity: 1, x: 0 } : {}}
                     transition={{ duration: 0.5, delay: 0.2 + i * 0.1 }}
-                    className="relative">
+                    className="relative"
+                  >
                     <div className="absolute -left-10 top-1.5 w-4 h-4 rounded-full border-2 border-primary bg-card" />
-                    <span className="text-xs font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full">{m.year}</span>
-                    <h3 className="text-lg font-display font-bold text-foreground mt-2 mb-1">{m.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{m.desc}</p>
+                    <span className="text-xs font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                      {m.year}
+                    </span>
+                    <h3 className="text-lg font-display font-bold text-foreground mt-2 mb-1">
+                      {m.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {m.desc}
+                    </p>
                   </motion.div>
                 ))}
               </div>
@@ -3888,30 +5775,57 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       <section className="py-24 border-y border-border bg-muted/20">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="text-center mb-14">
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">What We Stand For</span>
-            <h2 className="mt-4 text-4xl font-display font-extrabold text-foreground">Our principles</h2>
+            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+              What We Stand For
+            </span>
+            <h2 className="mt-4 text-4xl font-display font-extrabold text-foreground">
+              Our principles
+            </h2>
           </div>
           <div className="grid sm:grid-cols-2 gap-6">
             {principles.map(({ icon: Icon, color, title, desc }, i) => (
-              <TiltCard key={title} className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_6px_32px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_0_50px_rgba(82,51,253,0.12)] relative overflow-hidden">
+              <TiltCard
+                key={title}
+                className="group rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_6px_32px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_0_50px_rgba(82,51,253,0.12)] relative overflow-hidden"
+              >
                 <motion.div
-                  initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-8">
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                    style={{ background: `radial-gradient(ellipse at top left, ${color}06 0%, transparent 70%)` }} />
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="p-8"
+                >
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at top left, ${color}06 0%, transparent 70%)`,
+                    }}
+                  />
                   <div className="relative flex gap-5">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-                      style={{ background: `${color}18`, border: `1px solid ${color}30` }}>
+                    <div
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                      style={{
+                        background: `${color}18`,
+                        border: `1px solid ${color}30`,
+                      }}
+                    >
                       <Icon size={20} style={{ color }} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-display font-bold text-foreground mb-3">{title}</h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
+                      <h3 className="text-xl font-display font-bold text-foreground mb-3">
+                        {title}
+                      </h3>
+                      <p className="text-muted-foreground text-sm leading-relaxed">
+                        {desc}
+                      </p>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                    style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+                    }}
+                  />
                 </motion.div>
               </TiltCard>
             ))}
@@ -3926,16 +5840,24 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             Ready to explore?
           </h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed max-w-xl mx-auto">
-            Browse 500+ free Figma resources — or join as a publisher and share your work with the world.
+            Browse 500+ free Figma resources — or join as a publisher and share
+            your work with the world.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <button onClick={() => onNavigate("browse")}
-              className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300">
+            <button
+              onClick={() => onNavigate("browse")}
+              className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300"
+            >
               Browse Free Resources
-              <ArrowUpRight size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              <ArrowUpRight
+                size={18}
+                className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+              />
             </button>
-            <button onClick={() => onNavigate("publisher")}
-              className="flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300">
+            <button
+              onClick={() => onNavigate("publisher")}
+              className="flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300"
+            >
               Become a Publisher
             </button>
           </div>
@@ -3947,7 +5869,13 @@ function AboutPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
-function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; categories: Category[] }) {
+function Footer({
+  onNavigate,
+  categories,
+}: {
+  onNavigate: (p: Page) => void;
+  categories: Category[];
+}) {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
@@ -3956,26 +5884,36 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <div className="text-4xl text-foreground leading-none mb-2" style={{ fontFamily: "'Cookie', cursive" }}>
+            <div
+              className="text-4xl text-foreground leading-none mb-2"
+              style={{ fontFamily: "'Cookie', cursive" }}
+            >
               Layerat<span style={{ color: "#aaff38" }}>.</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              Premium Figma resources built by designers, for designers. Elevate your workflow.
+              Premium Figma resources built by designers, for designers. Elevate
+              your workflow.
             </p>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs font-mono text-primary">500+ resources available</span>
+              <span className="text-xs font-mono text-primary">
+                500+ resources available
+              </span>
             </div>
           </div>
 
           {/* Categories */}
           <div>
-            <h4 className="text-sm font-display font-bold text-foreground mb-4">Categories</h4>
+            <h4 className="text-sm font-display font-bold text-foreground mb-4">
+              Categories
+            </h4>
             <ul className="space-y-2">
-              {categories.map(cat => (
+              {categories.map((cat) => (
                 <li key={cat.id}>
-                  <button onClick={() => onNavigate("browse")}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left">
+                  <button
+                    onClick={() => onNavigate("browse")}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left"
+                  >
                     {cat.name}
                   </button>
                 </li>
@@ -3985,7 +5923,9 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
 
           {/* Quick links */}
           <div>
-            <h4 className="text-sm font-display font-bold text-foreground mb-4">Marketplace</h4>
+            <h4 className="text-sm font-display font-bold text-foreground mb-4">
+              Marketplace
+            </h4>
             <ul className="space-y-2">
               {[
                 { label: "Browse All", action: () => onNavigate("browse") },
@@ -3994,8 +5934,10 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
                 { label: "Top Rated", action: () => onNavigate("browse") },
               ].map(({ label, action }) => (
                 <li key={label}>
-                  <button onClick={action}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left">
+                  <button
+                    onClick={action}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left"
+                  >
                     {label}
                   </button>
                 </li>
@@ -4005,7 +5947,9 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
 
           {/* Company */}
           <div>
-            <h4 className="text-sm font-display font-bold text-foreground mb-4">Company</h4>
+            <h4 className="text-sm font-display font-bold text-foreground mb-4">
+              Company
+            </h4>
             <ul className="space-y-2">
               {[
                 { label: "About Us", page: "about" as Page },
@@ -4013,15 +5957,22 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
                 { label: "Become a Publisher", page: "publisher" as Page },
               ].map(({ label, page }) => (
                 <li key={label}>
-                  <button onClick={() => { onNavigate(page); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left">
+                  <button
+                    onClick={() => {
+                      onNavigate(page);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left"
+                  >
                     {label}
                   </button>
                 </li>
               ))}
-              {["Terms of Service", "Privacy Policy"].map(item => (
+              {["Terms of Service", "Privacy Policy"].map((item) => (
                 <li key={item}>
-                  <button className="text-sm text-muted-foreground hover:text-primary transition-colors text-left">{item}</button>
+                  <button className="text-sm text-muted-foreground hover:text-primary transition-colors text-left">
+                    {item}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -4031,13 +5982,21 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
         {/* Bottom row */}
         <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground text-center sm:text-left">
-            © {new Date().getFullYear()} Layerat Design Studio. All rights reserved.
+            © {new Date().getFullYear()} Layerat Design Studio. All rights
+            reserved.
           </p>
           <div className="flex items-center gap-4">
-            <p className="text-xs text-muted-foreground">Crafted with care for the design community</p>
-            <button onClick={scrollToTop}
-              className="w-9 h-9 rounded-full border border-border bg-card flex items-center justify-center hover:border-primary/50 hover:bg-primary/10 transition-all duration-200 group">
-              <ChevronLeft size={15} className="rotate-90 text-muted-foreground group-hover:text-primary transition-colors" />
+            <p className="text-xs text-muted-foreground">
+              Crafted with care for the design community
+            </p>
+            <button
+              onClick={scrollToTop}
+              className="w-9 h-9 rounded-full border border-border bg-card flex items-center justify-center hover:border-primary/50 hover:bg-primary/10 transition-all duration-200 group"
+            >
+              <ChevronLeft
+                size={15}
+                className="rotate-90 text-muted-foreground group-hover:text-primary transition-colors"
+              />
             </button>
           </div>
         </div>
@@ -4048,14 +6007,22 @@ function Footer({ onNavigate, categories }: { onNavigate: (p: Page) => void; cat
 
 // ─── Favorites Page ───────────────────────────────────────────────────────────
 
-function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate, products }: {
+function FavoritesPage({
+  authUser,
+  onProductClick,
+  onWishlistToggle,
+  onNavigate,
+  products,
+}: {
   authUser: AuthUser | null;
   onProductClick: (p: Product) => void;
   onWishlistToggle: (id: string) => void;
   onNavigate: (p: Page) => void;
   products: Product[];
 }) {
-  const favoriteProducts = products.filter(p => authUser?.wishlist.includes(p.id));
+  const favoriteProducts = products.filter((p) =>
+    authUser?.wishlist.includes(p.id)
+  );
 
   return (
     <main className="min-h-screen pt-24 pb-20">
@@ -4064,29 +6031,40 @@ function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate,
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-[#80E1BE]/15 dark:bg-[#FFD60A]/15 border border-[#80E1BE]/30 dark:border-[#FFD60A]/30 flex items-center justify-center">
-              <Heart size={18} className="text-[#0F7050] dark:text-[#B8A000] fill-current" />
+              <Heart
+                size={18}
+                className="text-[#0F7050] dark:text-[#B8A000] fill-current"
+              />
             </div>
-            <h1 className="text-3xl font-display font-bold text-foreground">My Favorites</h1>
+            <h1 className="text-3xl font-display font-bold text-foreground">
+              My Favorites
+            </h1>
           </div>
           <p className="text-muted-foreground text-sm ml-13">
             {favoriteProducts.length === 0
               ? "You haven't saved anything yet."
-              : `${favoriteProducts.length} saved resource${favoriteProducts.length !== 1 ? "s" : ""}`}
+              : `${favoriteProducts.length} saved resource${
+                  favoriteProducts.length !== 1 ? "s" : ""
+                }`}
           </p>
         </div>
 
         {favoriteProducts.length === 0 ? (
           /* Empty state */
           <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center py-28 text-center"
           >
             <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center mb-6">
               <Heart size={32} className="text-muted-foreground/40" />
             </div>
-            <h2 className="text-xl font-display font-bold text-foreground mb-2">Nothing saved yet</h2>
+            <h2 className="text-xl font-display font-bold text-foreground mb-2">
+              Nothing saved yet
+            </h2>
             <p className="text-sm text-muted-foreground mb-8 max-w-sm leading-relaxed">
-              Browse our resources and tap the heart icon on any card to save it here.
+              Browse our resources and tap the heart icon on any card to save it
+              here.
             </p>
             <button
               onClick={() => onNavigate("browse")}
@@ -4108,12 +6086,22 @@ function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate,
                 {/* Card */}
                 <div className="group relative rounded-3xl overflow-hidden border border-border bg-card transition-all duration-300 hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_20px_60px_rgba(0,0,0,0.35)] cursor-pointer">
                   {/* Thumbnail */}
-                  <div className="relative aspect-[4/3] overflow-hidden bg-muted" onClick={() => onProductClick(product)}>
-                    <img src={product.thumbnail} alt={product.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <div
+                    className="relative aspect-[4/3] overflow-hidden bg-muted"
+                    onClick={() => onProductClick(product)}
+                  >
+                    <img
+                      src={product.thumbnail}
+                      alt={product.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent dark:from-black/70 dark:via-black/20 pointer-events-none" />
                     {/* Remove from favorites */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); onWishlistToggle(product.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onWishlistToggle(product.id);
+                      }}
                       title="Remove from favorites"
                       className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-200 bg-[#80E1BE] text-[#0F0039] dark:bg-[#FFD60A] dark:text-[#0F0039] hover:scale-110"
                     >
@@ -4125,9 +6113,13 @@ function FavoritesPage({ authUser, onProductClick, onWishlistToggle, onNavigate,
                     <h3 className="text-sm font-display font-bold text-foreground mb-1 line-clamp-1 group-hover:text-primary transition-colors">
                       {product.title}
                     </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{product.shortDescription}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                      {product.shortDescription}
+                    </p>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-primary">{product.isFree ? "Free" : `$${product.price}`}</span>
+                      <span className="text-xs font-bold text-primary">
+                        {product.isFree ? "Free" : `$${product.price}`}
+                      </span>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Download size={11} />
                         {product.downloadsCount.toLocaleString()}
@@ -4151,7 +6143,9 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
   const [confirm, setConfirm] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -4185,17 +6179,25 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-xl">
-        <h2 className="text-xl font-display font-bold text-foreground mb-1">Set new password</h2>
-        <p className="text-sm text-muted-foreground mb-6">Enter a strong new password for your account.</p>
+        <h2 className="text-xl font-display font-bold text-foreground mb-1">
+          Set new password
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Enter a strong new password for your account.
+        </p>
 
         {status === "success" ? (
           <div className="text-center py-6">
-            <p className="text-sm font-semibold text-foreground">Password updated successfully!</p>
+            <p className="text-sm font-semibold text-foreground">
+              Password updated successfully!
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">New Password</label>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                New Password
+              </label>
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"}
@@ -4206,15 +6208,20 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
                   className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 pr-11"
                   placeholder="••••••••"
                 />
-                <button type="button" onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Confirm Password</label>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Confirm Password
+              </label>
               <div className="relative">
                 <input
                   type={showConfirm ? "text" : "password"}
@@ -4225,8 +6232,11 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
                   className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 pr-11"
                   placeholder="••••••••"
                 />
-                <button type="button" onClick={() => setShowConfirm(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
                   {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -4239,8 +6249,11 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            <button type="submit" disabled={status === "loading"}
-              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all">
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all"
+            >
               {status === "loading" ? "Updating..." : "Update Password"}
             </button>
           </form>
@@ -4293,21 +6306,45 @@ function PublisherApplicationsPanel() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30 text-left">
-              <th className="px-4 py-3 font-medium text-muted-foreground">Name</th>
-              <th className="px-4 py-3 font-medium text-muted-foreground">Email</th>
-              <th className="px-4 py-3 font-medium text-muted-foreground">Portfolio</th>
-              <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
-              <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">
+                Name
+              </th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">
+                Email
+              </th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">
+                Portfolio
+              </th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">
+                Status
+              </th>
+              <th className="px-4 py-3 font-medium text-muted-foreground">
+                Date
+              </th>
             </tr>
           </thead>
           <tbody>
             {apps.map((app) => (
-              <tr key={app.id} className="border-b border-border/60 hover:bg-muted/20">
-                <td className="px-4 py-3 text-foreground font-medium">{app.name}</td>
+              <tr
+                key={app.id}
+                className="border-b border-border/60 hover:bg-muted/20"
+              >
+                <td className="px-4 py-3 text-foreground font-medium">
+                  {app.name}
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">{app.email}</td>
                 <td className="px-4 py-3">
                   {app.portfolio ? (
-                    <a href={app.portfolio.startsWith("http") ? app.portfolio : `https://${app.portfolio}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                    <a
+                      href={
+                        app.portfolio.startsWith("http")
+                          ? app.portfolio
+                          : `https://${app.portfolio}`
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
                       Open
                     </a>
                   ) : (
@@ -4320,7 +6357,9 @@ function PublisherApplicationsPanel() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
-                  {app.created_at ? new Date(app.created_at).toLocaleDateString() : "—"}
+                  {app.created_at
+                    ? new Date(app.created_at).toLocaleDateString()
+                    : "—"}
                 </td>
               </tr>
             ))}
@@ -4330,6 +6369,720 @@ function PublisherApplicationsPanel() {
     </div>
   );
 }
+
+function ProductsAdminPanel({ categories }: { categories: Category[] }) {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+
+  const emptyForm = {
+    title: "",
+    slug: "",
+    short_description: "",
+    full_description: "",
+    thumbnail_url: "",
+    price: 0,
+    is_free: true,
+    category_id: "",
+    subcategory_id: "",
+    tags: "",
+    file_size: "",
+    formats: "Figma",
+    screens_count: 0,
+    components_count: 0,
+    version: "v1.0.0",
+    supports_variables: false,
+    supports_auto_layout: false,
+    supports_light_dark: false,
+    license_type: "personal",
+    download_file_url: "",
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [allSubcategories, setAllSubcategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadSubs = async () => {
+      const { data } = await supabase
+        .from("subcategories")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      setAllSubcategories(data || []);
+    };
+    loadSubs();
+  }, []);
+
+  const subcategories = allSubcategories.filter(
+    (s) => s.category_id === form.category_id
+  );
+
+  const loadProducts = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) console.error(error);
+    setProducts(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const generateSlug = (title: string) =>
+    title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
+
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setError("");
+    setSuccess("");
+    setGalleryUrls([]);
+  };
+
+  const startEdit = (p: any) => {
+    setEditingId(p.id);
+    setForm({
+      title: p.title || "",
+      slug: p.slug || "",
+      short_description: p.short_description || "",
+      full_description: p.full_description || "",
+      thumbnail_url: p.thumbnail_url || "",
+      price: p.price || 0,
+      is_free: p.is_free ?? true,
+      category_id: p.category_id || "",
+      subcategory_id: p.subcategory_id || "",
+      tags: Array.isArray(p.tags) ? p.tags.join(", ") : p.tags || "",
+      file_size: p.file_size || "",
+      formats: Array.isArray(p.formats)
+        ? p.formats.join(", ")
+        : p.formats || "Figma",
+      screens_count: p.screens_count || 0,
+      components_count: p.components_count || 0,
+      version: p.version || "v1.0.0",
+      supports_variables: p.supports_variables || false,
+      supports_auto_layout: p.supports_auto_layout || false,
+      supports_light_dark: p.supports_light_dark || false,
+      license_type: p.license_type || "personal",
+      download_file_url: p.download_file_url || "",
+    });
+    setError("");
+    setSuccess("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!form.title.trim() || !form.slug.trim()) {
+      setError("Title and slug are required.");
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      title: form.title.trim(),
+      slug: form.slug.trim(),
+      short_description: form.short_description.trim() || null,
+      full_description: form.full_description.trim() || null,
+      thumbnail_url: form.thumbnail_url.trim() || null,
+      price: form.is_free ? 0 : Number(form.price) || 0,
+      is_free: form.is_free,
+      category_id: form.category_id || null,
+      subcategory_id: form.subcategory_id || null,
+      tags: form.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      file_size: form.file_size || null,
+      formats: form.formats
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      screens_count: Number(form.screens_count) || 0,
+      components_count: Number(form.components_count) || 0,
+      version: form.version || null,
+      supports_variables: form.supports_variables,
+      supports_auto_layout: form.supports_auto_layout,
+      supports_light_dark: form.supports_light_dark,
+      license_type: form.license_type,
+      download_file_url: form.download_file_url.trim() || null,
+    };
+
+    let productId = editingId as string | null;
+
+    if (editingId) {
+      const { error } = await supabase
+        .from("products")
+        .update(payload)
+        .eq("id", editingId);
+      setSaving(false);
+      if (error) {
+        if (error.code === "23505") setError("This slug already exists.");
+        else setError(error.message || "Failed to save product.");
+        return;
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("products")
+        .insert(payload)
+        .select("id")
+        .single();
+      setSaving(false);
+      if (error) {
+        if (error.code === "23505") setError("This slug already exists.");
+        else setError(error.message || "Failed to save product.");
+        return;
+      }
+      productId = data.id;
+    }
+
+    // Save gallery images
+    if (productId && galleryUrls.length > 0) {
+      if (editingId) {
+        await supabase
+          .from("product_images")
+          .delete()
+          .eq("product_id", productId);
+      }
+      await supabase.from("product_images").insert(
+        galleryUrls.map((url, index) => ({
+          product_id: productId,
+          image_url: url,
+          sort_order: index,
+        }))
+      );
+    }
+
+    setSuccess(editingId ? "Product updated." : "Product created.");
+    resetForm();
+    loadProducts();
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    if (editingId === id) resetForm();
+    loadProducts();
+  };
+
+  const inputCls =
+    "w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none";
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+      {/* Form */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-start justify-between gap-3 mb-6">
+          <div>
+            <h2 className="text-lg font-display font-bold text-foreground">
+              {editingId ? "Edit Product" : "Add Product"}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Fill product details. Image upload comes next.
+            </p>
+          </div>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 max-h-[70vh] overflow-y-auto pr-1"
+        >
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Title *
+            </label>
+            <input
+              value={form.title}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  title: e.target.value,
+                  slug: editingId ? f.slug : generateSlug(e.target.value),
+                }))
+              }
+              className={inputCls}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Slug *
+            </label>
+            <input
+              value={form.slug}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, slug: generateSlug(e.target.value) }))
+              }
+              className={`${inputCls} font-mono`}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Short Description
+            </label>
+            <input
+              value={form.short_description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, short_description: e.target.value }))
+              }
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Full Description
+            </label>
+            <textarea
+              value={form.full_description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, full_description: e.target.value }))
+              }
+              rows={4}
+              className={`${inputCls} resize-none`}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Thumbnail Image
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setSaving(true);
+                setError("");
+                const ext = file.name.split(".").pop();
+                const path = `thumbnails/${Date.now()}-${Math.random()
+                  .toString(36)
+                  .slice(2)}.${ext}`;
+                const { error: uploadError } = await supabase.storage
+                  .from("product-images")
+                  .upload(path, file);
+                if (uploadError) {
+                  setError(uploadError.message);
+                  setSaving(false);
+                  return;
+                }
+                const { data } = supabase.storage
+                  .from("product-images")
+                  .getPublicUrl(path);
+                setForm((f) => ({ ...f, thumbnail_url: data.publicUrl }));
+                setSaving(false);
+              }}
+              className="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-primary file:font-medium"
+            />
+            {form.thumbnail_url && (
+              <img
+                src={form.thumbnail_url}
+                alt="Thumbnail preview"
+                className="mt-3 w-full max-w-xs h-36 object-cover rounded-xl border border-border"
+              />
+            )}
+          </div>
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Gallery Images
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                setSaving(true);
+                setError("");
+                const urls: string[] = [];
+                for (const file of files) {
+                  const ext = file.name.split(".").pop();
+                  const path = `gallery/${Date.now()}-${Math.random()
+                    .toString(36)
+                    .slice(2)}.${ext}`;
+                  const { error: uploadError } = await supabase.storage
+                    .from("product-images")
+                    .upload(path, file);
+                  if (uploadError) {
+                    setError(uploadError.message);
+                    continue;
+                  }
+                  const { data } = supabase.storage
+                    .from("product-images")
+                    .getPublicUrl(path);
+                  urls.push(data.publicUrl);
+                }
+                setGalleryUrls((prev) => [...prev, ...urls]);
+                setSaving(false);
+              }}
+              className="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-primary file:font-medium"
+            />
+
+            {galleryUrls.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {galleryUrls.map((url) => (
+                  <div key={url} className="relative">
+                    <img
+                      src={url}
+                      alt=""
+                      className="w-full h-24 object-cover rounded-lg border border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setGalleryUrls((prev) => prev.filter((u) => u !== url))
+                      }
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Category
+              </label>
+              <select
+                value={form.category_id}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    category_id: e.target.value,
+                    subcategory_id: "",
+                  }))
+                }
+                className={inputCls}
+              >
+                <option value="">Select category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Subcategory
+              </label>
+              <select
+                value={form.subcategory_id}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, subcategory_id: e.target.value }))
+                }
+                className={inputCls}
+                disabled={!form.category_id}
+              >
+                <option value="">Select subcategory</option>
+                {subcategories.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={form.is_free}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    is_free: e.target.checked,
+                    price: e.target.checked ? 0 : f.price,
+                  }))
+                }
+              />
+              Free product
+            </label>
+            {!form.is_free && (
+              <input
+                type="number"
+                value={form.price}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, price: Number(e.target.value) }))
+                }
+                placeholder="Price"
+                className={inputCls}
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Tags (comma separated)
+            </label>
+            <input
+              value={form.tags}
+              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+              placeholder="UI Kit, Figma, Dashboard"
+              className={inputCls}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                File Size
+              </label>
+              <input
+                value={form.file_size}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, file_size: e.target.value }))
+                }
+                placeholder="24.2 MB"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Version
+              </label>
+              <input
+                value={form.version}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, version: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Screens
+              </label>
+              <input
+                type="number"
+                value={form.screens_count}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    screens_count: Number(e.target.value),
+                  }))
+                }
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Components
+              </label>
+              <input
+                type="number"
+                value={form.components_count}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    components_count: Number(e.target.value),
+                  }))
+                }
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Formats
+            </label>
+            <input
+              value={form.formats}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, formats: e.target.value }))
+              }
+              placeholder="Figma, Sketch"
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              License
+            </label>
+            <select
+              value={form.license_type}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, license_type: e.target.value }))
+              }
+              className={inputCls}
+            >
+              <option value="personal">Personal</option>
+              <option value="commercial">Commercial</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap gap-4 text-sm">
+            {[
+              ["supports_variables", "Variables"],
+              ["supports_auto_layout", "Auto Layout"],
+              ["supports_light_dark", "Light/Dark"],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={(form as any)[key]}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, [key]: e.target.checked }))
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Download File URL (temporary)
+            </label>
+            <input
+              value={form.download_file_url}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, download_file_url: e.target.value }))
+              }
+              placeholder="https://..."
+              className={inputCls}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-destructive/20 border border-red-200 dark:border-destructive/30 rounded-xl px-4 py-3">
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+          {success && (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-3">
+              <CheckCircle size={14} /> {success}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all"
+          >
+            {saving
+              ? "Saving..."
+              : editingId
+              ? "Save Changes"
+              : "Create Product"}
+          </button>
+        </form>
+      </div>
+
+      {/* List */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-lg font-display font-bold text-foreground">
+            Products ({products.length})
+          </h2>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-muted-foreground">
+            Loading...
+          </div>
+        ) : products.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            No products yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-border max-h-[70vh] overflow-y-auto">
+            {products.map((p) => (
+              <div
+                key={p.id}
+                className={`px-5 py-4 flex items-center gap-4 ${
+                  editingId === p.id ? "bg-primary/5" : ""
+                }`}
+              >
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-muted border border-border shrink-0">
+                  {p.thumbnail_url ? (
+                    <img
+                      src={p.thumbnail_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                      No img
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground truncate">
+                    {p.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono truncate">
+                    {p.slug} · {p.is_free ? "Free" : `$${p.price}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(p)}
+                    className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(p.id, p.title)}
+                    className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CategoriesAdminPanel() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4337,6 +7090,13 @@ function CategoriesAdminPanel() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [subForm, setSubForm] = useState({
+    category_id: "",
+    name: "",
+    slug: "",
+  });
+  const [subSaving, setSubSaving] = useState(false);
 
   const emptyForm = {
     name: "",
@@ -4347,7 +7107,16 @@ function CategoriesAdminPanel() {
   };
 
   const [form, setForm] = useState(emptyForm);
-  const iconOptions = ["Layers", "Layout", "FileText", "Package", "Smartphone", "Globe", "Code", "Zap"];
+  const iconOptions = [
+    "Layers",
+    "Layout",
+    "FileText",
+    "Package",
+    "Smartphone",
+    "Globe",
+    "Code",
+    "Zap",
+  ];
 
   const loadCategories = async () => {
     setLoading(true);
@@ -4357,6 +7126,11 @@ function CategoriesAdminPanel() {
       .order("sort_order", { ascending: true });
     if (error) console.error(error);
     setCategories(data || []);
+    const { data: subs } = await supabase
+      .from("subcategories")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    setSubcategories(subs || []);
     setLoading(false);
   };
 
@@ -4365,7 +7139,12 @@ function CategoriesAdminPanel() {
   }, []);
 
   const generateSlug = (name: string) =>
-    name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
 
   const resetForm = () => {
     setForm(emptyForm);
@@ -4387,6 +7166,25 @@ function CategoriesAdminPanel() {
     setSuccess("");
   };
 
+  const handleAddSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subForm.category_id || !subForm.name.trim() || !subForm.slug.trim())
+      return;
+    setSubSaving(true);
+    const { error } = await supabase.from("subcategories").insert({
+      category_id: subForm.category_id,
+      name: subForm.name.trim(),
+      slug: subForm.slug.trim(),
+      sort_order: 0,
+    });
+    setSubSaving(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setSubForm({ category_id: "", name: "", slug: "" });
+    loadCategories();
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -4437,11 +7235,17 @@ function CategoriesAdminPanel() {
               {editingId ? "Edit Category" : "Add Category"}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              {editingId ? "Update category details then save." : "Create a category for navbar and browse filters."}
+              {editingId
+                ? "Update category details then save."
+                : "Create a category for navbar and browse filters."}
             </p>
           </div>
           {editingId && (
-            <button type="button" onClick={resetForm} className="text-xs text-muted-foreground hover:text-foreground">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
               Cancel
             </button>
           )}
@@ -4449,10 +7253,18 @@ function CategoriesAdminPanel() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Name *</label>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Name *
+            </label>
             <input
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value, slug: editingId ? f.slug : generateSlug(e.target.value) }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  name: e.target.value,
+                  slug: editingId ? f.slug : generateSlug(e.target.value),
+                }))
+              }
               placeholder="e.g. UI Kits"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               required
@@ -4460,10 +7272,14 @@ function CategoriesAdminPanel() {
           </div>
 
           <div>
-            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Slug *</label>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Slug *
+            </label>
             <input
               value={form.slug}
-              onChange={(e) => setForm((f) => ({ ...f, slug: generateSlug(e.target.value) }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, slug: generateSlug(e.target.value) }))
+              }
               placeholder="ui-kits"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
               required
@@ -4471,29 +7287,57 @@ function CategoriesAdminPanel() {
           </div>
 
           <div>
-            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Icon</label>
+            <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+              Icon
+            </label>
             <select
               value={form.icon}
               onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
               className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               {iconOptions.map((icon) => (
-                <option key={icon} value={icon}>{icon}</option>
+                <option key={icon} value={icon}>
+                  {icon}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Color</label>
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Color
+              </label>
               <div className="flex items-center gap-2">
-                <input type="color" value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} className="w-12 h-11 rounded-xl border border-border bg-background" />
-                <input value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} className="flex-1 min-w-0 px-3 py-3 rounded-xl border border-border bg-background text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                <input
+                  type="color"
+                  value={form.color}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, color: e.target.value }))
+                  }
+                  className="w-12 h-11 rounded-xl border border-border bg-background"
+                />
+                <input
+                  value={form.color}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, color: e.target.value }))
+                  }
+                  className="flex-1 min-w-0 px-3 py-3 rounded-xl border border-border bg-background text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
               </div>
             </div>
             <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">Sort Order</label>
-              <input type="number" value={form.sort_order} onChange={(e) => setForm((f) => ({ ...f, sort_order: Number(e.target.value) }))} className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                Sort Order
+              </label>
+              <input
+                type="number"
+                value={form.sort_order}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, sort_order: Number(e.target.value) }))
+                }
+                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
             </div>
           </div>
 
@@ -4508,8 +7352,16 @@ function CategoriesAdminPanel() {
             </div>
           )}
 
-          <button type="submit" disabled={saving} className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all">
-            {saving ? "Saving..." : editingId ? "Save Changes" : "Create Category"}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all"
+          >
+            {saving
+              ? "Saving..."
+              : editingId
+              ? "Save Changes"
+              : "Create Category"}
           </button>
         </form>
       </div>
@@ -4517,23 +7369,99 @@ function CategoriesAdminPanel() {
       {/* RIGHT: List */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
-          <h2 className="text-lg font-display font-bold text-foreground">Existing Categories</h2>
+          <h2 className="text-lg font-display font-bold text-foreground">
+            Existing Categories
+          </h2>
+          {subForm.category_id && (
+            <form
+              onSubmit={handleAddSubcategory}
+              className="mt-4 p-4 rounded-xl border border-border bg-muted/20 space-y-3"
+            >
+              <div className="text-sm font-medium text-foreground">
+                Add subcategory under:{" "}
+                {categories.find((c) => c.id === subForm.category_id)?.name}
+              </div>
+              <input
+                value={subForm.name}
+                onChange={(e) =>
+                  setSubForm((f) => ({
+                    ...f,
+                    name: e.target.value,
+                    slug: e.target.value
+                      .toLowerCase()
+                      .trim()
+                      .replace(/[^a-z0-9\s-]/g, "")
+                      .replace(/\s+/g, "-"),
+                  }))
+                }
+                placeholder="Subcategory name"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                required
+              />
+              <input
+                value={subForm.slug}
+                onChange={(e) =>
+                  setSubForm((f) => ({ ...f, slug: e.target.value }))
+                }
+                placeholder="slug"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+                required
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={subSaving}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
+                >
+                  {subSaving ? "Saving..." : "Save subcategory"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSubForm({ category_id: "", name: "", slug: "" })
+                  }
+                  className="px-4 py-2 rounded-lg border border-border text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-muted-foreground">Loading...</div>
+          <div className="p-8 text-center text-muted-foreground">
+            Loading...
+          </div>
         ) : categories.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">No categories yet.</div>
+          <div className="p-8 text-center text-muted-foreground">
+            No categories yet.
+          </div>
         ) : (
           <div className="divide-y divide-border">
             {categories.map((cat) => (
-              <div key={cat.id} className={`px-5 py-4 flex items-center gap-4 ${editingId === cat.id ? "bg-primary/5" : ""}`}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-border" style={{ backgroundColor: `${cat.color}22`, color: cat.color }}>
+              <div
+                key={cat.id}
+                className={`px-5 py-4 flex flex-wrap items-center gap-4 ${
+                  editingId === cat.id ? "bg-primary/5" : ""
+                }`}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center border border-border"
+                  style={{
+                    backgroundColor: `${cat.color}22`,
+                    color: cat.color,
+                  }}
+                >
                   <Layers size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-foreground truncate">{cat.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono truncate">{cat.slug} · {cat.icon} · #{cat.sort_order}</div>
+                  <div className="font-medium text-foreground truncate">
+                    {cat.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono truncate">
+                    {cat.slug} · {cat.icon} · #{cat.sort_order}
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -4542,6 +7470,27 @@ function CategoriesAdminPanel() {
                 >
                   Edit
                 </button>
+                <div className="basis-full mt-2 space-y-1">
+                  {subcategories
+                    .filter((s) => s.category_id === cat.id)
+                    .map((s) => (
+                      <div
+                        key={s.id}
+                        className="text-xs text-muted-foreground font-mono"
+                      >
+                        — {s.name}
+                      </div>
+                    ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSubForm({ category_id: cat.id, name: "", slug: "" })
+                    }
+                    className="text-xs text-primary hover:underline"
+                  >
+                    + Add subcategory
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -4550,19 +7499,30 @@ function CategoriesAdminPanel() {
     </div>
   );
 }
-function AdminPage({ authUser, onNavigate }: {
+function AdminPage({
+  authUser,
+  onNavigate,
+  categories,
+}: {
   authUser: AuthUser | null;
   onNavigate: (p: Page) => void;
+  categories: Category[];
 }) {
-  const [tab, setTab] = useState<"products" | "categories" | "publishers">("products");
+  const [tab, setTab] = useState<"products" | "categories" | "publishers">(
+    "products"
+  );
 
   // حماية: مش أدمن → يرجع للـ home
   if (!authUser || authUser.role !== "admin") {
     return (
       <main className="min-h-screen pt-24 pb-20 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-display font-bold text-foreground mb-2">Access denied</h1>
-          <p className="text-muted-foreground mb-6">You need admin access to view this page.</p>
+          <h1 className="text-2xl font-display font-bold text-foreground mb-2">
+            Access denied
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            You need admin access to view this page.
+          </p>
           <button
             onClick={() => onNavigate("home")}
             className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-bold text-sm"
@@ -4578,8 +7538,12 @@ function AdminPage({ authUser, onNavigate }: {
     <main className="min-h-screen pt-24 pb-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-8">
-          <h1 className="text-3xl font-display font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage products, categories, and publisher applications</p>
+          <h1 className="text-3xl font-display font-bold text-foreground">
+            Admin Dashboard
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Manage products, categories, and publisher applications
+          </p>
         </div>
 
         {/* Tabs */}
@@ -4588,7 +7552,7 @@ function AdminPage({ authUser, onNavigate }: {
             { id: "products" as const, label: "Products" },
             { id: "categories" as const, label: "Categories" },
             { id: "publishers" as const, label: "Publisher Applications" },
-          ].map(t => (
+          ].map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -4604,17 +7568,9 @@ function AdminPage({ authUser, onNavigate }: {
         </div>
 
         {/* Content placeholders */}
-        {tab === "products" && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-muted-foreground">
-            Products management — coming next
-          </div>
-        )}
-        {tab === "categories" && (
-          <CategoriesAdminPanel />
-        )}
-        {tab === "publishers" && (
-  <PublisherApplicationsPanel />
-)}
+        {tab === "products" && <ProductsAdminPanel categories={categories} />}
+        {tab === "categories" && <CategoriesAdminPanel />}
+        {tab === "publishers" && <PublisherApplicationsPanel />}
       </div>
     </main>
   );
@@ -4629,9 +7585,13 @@ export default function App() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [authModal, setAuthModal] = useState<"login" | "register" | "forgot_password" | null>(null);
+  const [authModal, setAuthModal] = useState<
+    "login" | "register" | "forgot_password" | null
+  >(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
-  const [browseFilters, setBrowseFilters] = useState<Partial<BrowseFilters>>({});
+  const [browseFilters, setBrowseFilters] = useState<Partial<BrowseFilters>>(
+    {}
+  );
   const [giftScrollReady, setGiftScrollReady] = useState(false);
   const [forceShowContent, setForceShowContent] = useState(false);
 
@@ -4663,92 +7623,105 @@ export default function App() {
 
   // Restore auth session on app mount
   // TODO: Also validate token with GET ${API_BASE}/auth/me
-// Restore auth session on app mount
-useEffect(() => {
-  const restoreSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+  // Restore auth session on app mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    if (session?.user) {
-      const user = session.user;
+      if (session?.user) {
+        const user = session.user;
 
-      // Fetch user's wishlist from Supabase
-      const { data: wishlistData, error: wishlistError } = await supabase
-        .from('wishlist')
-        .select('product_id')
-        .eq('user_id', user.id);
+        // Fetch user's wishlist from Supabase
+        const { data: wishlistData, error: wishlistError } = await supabase
+          .from("wishlist")
+          .select("product_id")
+          .eq("user_id", user.id);
 
-      if (wishlistError) {
-        console.error('Error fetching wishlist:', wishlistError);
+        if (wishlistError) {
+          console.error("Error fetching wishlist:", wishlistError);
+        }
+
+        const wishlistIds = wishlistData?.map((w) => w.product_id) || [];
+        console.log("Loaded wishlist from Supabase:", wishlistIds);
+
+        // جلب الـ role من profiles
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, full_name, avatar_url")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        setAuthUser({
+          id: user.id,
+          name:
+            profile?.full_name ||
+            user.user_metadata?.full_name ||
+            user.email?.split("@")[0] ||
+            "User",
+          email: user.email || "",
+          role: (profile?.role as "user" | "admin") || "user",
+          purchases: [],
+          wishlist: wishlistIds,
+          createdAt: user.created_at || new Date().toISOString(),
+        });
+      }
+    };
+
+    restoreSession();
+
+    // الاستماع لتغييرات الجلسة (تسجيل دخول / خروج)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Password recovery link clicked
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+        return;
       }
 
-      const wishlistIds = wishlistData?.map(w => w.product_id) || [];
-      console.log('Loaded wishlist from Supabase:', wishlistIds);
+      if (session?.user) {
+        const user = session.user;
 
-      // جلب الـ role من profiles
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, full_name, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
+        const { data: wishlistData, error: wishlistError } = await supabase
+          .from("wishlist")
+          .select("product_id")
+          .eq("user_id", user.id);
 
-      setAuthUser({
-        id: user.id,
-        name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        email: user.email || "",
-        role: (profile?.role as "user" | "admin") || "user",
-        purchases: [],
-        wishlist: wishlistIds,
-        createdAt: user.created_at || new Date().toISOString(),
-      });
-    }
-  };
-  restoreSession();
+        if (wishlistError) {
+          console.error("Error fetching wishlist:", wishlistError);
+        }
 
-  // الاستماع لتغييرات الجلسة (تسجيل دخول / خروج)
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-    // Password recovery link clicked
-    if (event === "PASSWORD_RECOVERY") {
-      setPasswordRecovery(true);
-      return;
-    }
+        const wishlistIds = wishlistData?.map((w) => w.product_id) || [];
 
-    if (session?.user) {
-      const user = session.user;
+        // جلب الـ role من profiles
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, full_name, avatar_url")
+          .eq("id", user.id)
+          .maybeSingle();
 
-      const { data: wishlistData, error: wishlistError } = await supabase
-        .from('wishlist')
-        .select('product_id')
-        .eq('user_id', user.id);
-
-      if (wishlistError) {
-        console.error('Error fetching wishlist:', wishlistError);
+        setAuthUser({
+          id: user.id,
+          name:
+            profile?.full_name ||
+            user.user_metadata?.full_name ||
+            user.email?.split("@")[0] ||
+            "User",
+          email: user.email || "",
+          role: (profile?.role as "user" | "admin") || "user",
+          purchases: [],
+          wishlist: wishlistIds,
+          createdAt: user.created_at || new Date().toISOString(),
+        });
+      } else {
+        setAuthUser(null);
       }
+    });
 
-      const wishlistIds = wishlistData?.map(w => w.product_id) || [];
-
-      // جلب الـ role من profiles
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, full_name, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      setAuthUser({
-        id: user.id,
-        name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
-        email: user.email || "",
-        role: (profile?.role as "user" | "admin") || "user",
-        purchases: [],
-        wishlist: wishlistIds,
-        createdAt: user.created_at || new Date().toISOString(),
-      });
-    } else {
-      setAuthUser(null);
-    }
-  });
-  
-  return () => subscription.unsubscribe();
-}, []);
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Fetch categories from Supabase
   useEffect(() => {
@@ -4756,23 +7729,23 @@ useEffect(() => {
       setCategoriesLoading(true);
 
       const { data: cats, error: catsError } = await supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order', { ascending: true });
+        .from("categories")
+        .select("*")
+        .order("sort_order", { ascending: true });
 
       if (catsError) {
-        console.error('Error fetching categories:', catsError);
+        console.error("Error fetching categories:", catsError);
         setCategoriesLoading(false);
         return;
       }
 
       const { data: subs, error: subsError } = await supabase
-        .from('subcategories')
-        .select('*')
-        .order('sort_order', { ascending: true });
+        .from("subcategories")
+        .select("*")
+        .order("sort_order", { ascending: true });
 
       if (subsError) {
-        console.error('Error fetching subcategories:', subsError);
+        console.error("Error fetching subcategories:", subsError);
         setCategoriesLoading(false);
         return;
       }
@@ -4790,7 +7763,7 @@ useEffect(() => {
         name: cat.name,
         slug: cat.slug,
         icon: iconMap[cat.icon] || Layers,
-        color: cat.color || '#aaff38',
+        color: cat.color || "#aaff38",
         subcategories: (subs || [])
           .filter((s: any) => s.category_id === cat.id)
           .map((s: any) => ({
@@ -4814,25 +7787,27 @@ useEffect(() => {
       try {
         // Fetch all products
         const { data: productsData, error: productsError } = await supabase
-          .from('products')
-          .select(`
+          .from("products")
+          .select(
+            `
               *,
               downloads(count),
               product_views(count),
               reviews(rating)
-            `)
-          .order('created_at', { ascending: false });
+            `
+          )
+          .order("created_at", { ascending: false });
 
         if (productsError) {
-          console.error('Error fetching products:', productsError);
+          console.error("Error fetching products:", productsError);
           setProductsLoading(false);
           return;
         }
 
-        console.log('Fetched products:', productsData);
+        console.log("Fetched products:", productsData);
 
         if (!productsData || productsData.length === 0) {
-          console.log('No products found');
+          console.log("No products found");
           setProducts([]);
           setProductsLoading(false);
           return;
@@ -4840,16 +7815,16 @@ useEffect(() => {
 
         // Fetch product images
         const { data: imagesData, error: imagesError } = await supabase
-          .from('product_images')
-          .select('*')
-          .order('sort_order', { ascending: true });
+          .from("product_images")
+          .select("*")
+          .order("sort_order", { ascending: true });
 
         if (imagesError) {
-          console.error('Error fetching product images:', imagesError);
+          console.error("Error fetching product images:", imagesError);
           // Continue anyway, just won't have images
         }
 
-        console.log('Fetched product images:', imagesData);
+        console.log("Fetched product images:", imagesData);
 
         // Parse tags from JSON and map products
         const mapped: Product[] = (productsData || []).map((p: any) => {
@@ -4866,38 +7841,57 @@ useEffect(() => {
             fullDescription: p.full_description,
             price: p.price || 0,
             discountPrice: p.discount_price,
-            currency: p.currency || 'USD',
+            currency: p.currency || "USD",
             isFree: p.is_free || p.price === 0,
             thumbnail: p.thumbnail_url,
-            galleryImages: productImages.length > 0 ? productImages : [p.thumbnail_url],
+            galleryImages:
+              productImages.length > 0 ? productImages : [p.thumbnail_url],
             figmaPreviewUrl: p.figma_preview_url,
             categoryId: p.category_id,
             subcategoryId: p.subcategory_id,
-            tags: Array.isArray(p.tags) ? p.tags : (p.tags ? JSON.parse(p.tags) : []),
+            tags: Array.isArray(p.tags)
+              ? p.tags
+              : p.tags
+              ? JSON.parse(p.tags)
+              : [],
             fileSize: p.file_size,
-            formats: Array.isArray(p.formats) ? p.formats : (p.formats ? JSON.parse(p.formats) : []),
+            formats: Array.isArray(p.formats)
+              ? p.formats
+              : p.formats
+              ? JSON.parse(p.formats)
+              : [],
             screensCount: p.screens_count || 0,
             componentsCount: p.components_count || 0,
             version: p.version,
             supportsVariables: p.supports_variables || false,
             supportsAutoLayout: p.supports_auto_layout || false,
             supportsLightDark: p.supports_light_dark || false,
-            licenseType: p.license_type || 'personal',
+            licenseType: p.license_type || "personal",
             downloadsCount: p.downloads?.[0]?.count ?? 0,
             viewsCount: p.product_views?.[0]?.count ?? 0,
-            rating: Array.isArray(p.reviews) && p.reviews.length > 0
-              ? Math.round((p.reviews.reduce((s: number, r: any) => s + (r.rating || 0), 0) / p.reviews.length) * 10) / 10
-              : 0,
+            rating:
+              Array.isArray(p.reviews) && p.reviews.length > 0
+                ? Math.round(
+                    (p.reviews.reduce(
+                      (s: number, r: any) => s + (r.rating || 0),
+                      0
+                    ) /
+                      p.reviews.length) *
+                      10
+                  ) / 10
+                : 0,
             reviewsCount: Array.isArray(p.reviews) ? p.reviews.length : 0,
-            downloadFileUrl: p.download_file_url || `https://cdn.example.com/files/${p.id}.zip`,
+            downloadFileUrl:
+              p.download_file_url ||
+              `https://cdn.example.com/files/${p.id}.zip`,
           };
         });
 
-        console.log('Mapped products:', mapped);
+        console.log("Mapped products:", mapped);
         setProducts(mapped);
         setProductsLoading(false);
       } catch (err) {
-        console.error('Unexpected error fetching products:', err);
+        console.error("Unexpected error fetching products:", err);
         setProductsLoading(false);
       }
     };
@@ -4913,12 +7907,12 @@ useEffect(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
-  
-const handleLogout = async () => {
-  await supabase.auth.signOut();
-  setAuthUser(null);
-  setPage("home");
-};
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setAuthUser(null);
+    setPage("home");
+  };
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -4958,8 +7952,8 @@ const handleLogout = async () => {
     const updated = {
       ...authUser,
       wishlist: inWishlist
-        ? authUser.wishlist.filter(id => id !== productId)
-        : [...authUser.wishlist, productId]
+        ? authUser.wishlist.filter((id) => id !== productId)
+        : [...authUser.wishlist, productId],
     };
     setAuthUser(updated);
 
@@ -4968,45 +7962,43 @@ const handleLogout = async () => {
       if (inWishlist) {
         // Remove from wishlist
         const { error } = await supabase
-          .from('wishlist')
+          .from("wishlist")
           .delete()
-          .eq('user_id', authUser.id)
-          .eq('product_id', productId);
+          .eq("user_id", authUser.id)
+          .eq("product_id", productId);
 
         if (error) {
-          console.error('Error removing from wishlist:', error);
+          console.error("Error removing from wishlist:", error);
           // Revert optimistic update
           setAuthUser(authUser);
         } else {
-          console.log('Removed from wishlist:', productId);
+          console.log("Removed from wishlist:", productId);
         }
       } else {
         // Add to wishlist
-        const { error } = await supabase
-          .from('wishlist')
-          .insert({
-            user_id: authUser.id,
-            product_id: productId,
-            created_at: new Date().toISOString(),
-          });
+        const { error } = await supabase.from("wishlist").insert({
+          user_id: authUser.id,
+          product_id: productId,
+          created_at: new Date().toISOString(),
+        });
 
         if (error) {
-          console.error('Error adding to wishlist:', error);
+          console.error("Error adding to wishlist:", error);
           // Revert optimistic update
           setAuthUser(authUser);
         } else {
-          console.log('Added to wishlist:', productId);
+          console.log("Added to wishlist:", productId);
         }
       }
     } catch (err) {
-      console.error('Unexpected error toggling wishlist:', err);
+      console.error("Unexpected error toggling wishlist:", err);
       // Revert optimistic update
       setAuthUser(authUser);
     }
   };
 
   const handleProfileUpdate = (updates: Partial<AuthUser>) => {
-    setAuthUser(u => {
+    setAuthUser((u) => {
       if (!u) return u;
       const updated = { ...u, ...updates };
       localStorage.setItem("ld_user", JSON.stringify(updated));
@@ -5024,7 +8016,8 @@ const handleLogout = async () => {
     return () => window.clearTimeout(timeout);
   }, [productsLoading, categoriesLoading]);
 
-  const showGlobalLoader = (productsLoading || categoriesLoading) && !forceShowContent;
+  const showGlobalLoader =
+    (productsLoading || categoriesLoading) && !forceShowContent;
 
   return (
     <AnimatePresence mode="wait">
@@ -5043,8 +8036,12 @@ const handleLogout = async () => {
               <div className="absolute inset-0 rounded-full border border-primary/20" />
             </div>
             <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-[0.34em] text-muted-foreground">Layerat</p>
-              <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Loading your library</h1>
+              <p className="text-[11px] uppercase tracking-[0.34em] text-muted-foreground">
+                Layerat
+              </p>
+              <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
+                Loading your library
+              </h1>
             </div>
           </div>
         </motion.div>
@@ -5060,9 +8057,12 @@ const handleLogout = async () => {
 
           <Navbar
             isDark={isDark}
-            onToggle={() => setIsDark(d => !d)}
+            onToggle={() => setIsDark((d) => !d)}
             page={page}
-            onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            onNavigate={(p) => {
+              setPage(p);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
             authUser={authUser}
             onAuthOpen={setAuthModal}
             onLogout={handleLogout}
@@ -5074,15 +8074,21 @@ const handleLogout = async () => {
               setPage("browse");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            activeCategoryId={page === "browse" ? (browseFilters.categoryId ?? null) : null}
+            activeCategoryId={
+              page === "browse" ? browseFilters.categoryId ?? null : null
+            }
           />
 
           {passwordRecovery && (
-          <SetNewPasswordModal onClose={() => setPasswordRecovery(false)} />
+            <SetNewPasswordModal onClose={() => setPasswordRecovery(false)} />
           )}
 
           {/* Gift popup — shown to guests after scrolling past section 2 */}
-          <GiftPopup authUser={authUser} onSuccess={handleAuthSuccess} scrollReady={giftScrollReady} />
+          <GiftPopup
+            authUser={authUser}
+            onSuccess={handleAuthSuccess}
+            scrollReady={giftScrollReady}
+          />
 
           {/* Auth modal */}
           <AnimatePresence>
@@ -5099,10 +8105,23 @@ const handleLogout = async () => {
           {/* Page routing */}
           <AnimatePresence mode="wait">
             {page === "home" && (
-              <motion.main key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                <Hero onSearch={handleSearch} onNavigate={setPage} onAuthOpen={setAuthModal} />
+              <motion.main
+                key="home"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Hero
+                  onSearch={handleSearch}
+                  onNavigate={setPage}
+                  onAuthOpen={setAuthModal}
+                />
                 <StatsSection />
-                <CategoriesSection onCategoryClick={handleCategoryClick} categories={categories} />
+                <CategoriesSection
+                  onCategoryClick={handleCategoryClick}
+                  categories={categories}
+                />
                 <FeaturedProducts
                   products={products}
                   onProductClick={handleProductClick}
@@ -5118,7 +8137,13 @@ const handleLogout = async () => {
             )}
 
             {page === "browse" && (
-              <motion.main key="browse" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <motion.main
+                key="browse"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 <BrowsePage
                   initialFilters={browseFilters}
                   onProductClick={handleProductClick}
@@ -5133,7 +8158,13 @@ const handleLogout = async () => {
             )}
 
             {page === "product" && selectedProduct && (
-              <motion.main key="product" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <motion.main
+                key="product"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 <ProductDetail
                   product={selectedProduct}
                   onBack={handleBack}
@@ -5147,7 +8178,13 @@ const handleLogout = async () => {
             )}
 
             {page === "profile" && authUser && (
-              <motion.main key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <motion.main
+                key="profile"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 <ProfilePage
                   authUser={authUser}
                   onUpdate={handleProfileUpdate}
@@ -5159,33 +8196,75 @@ const handleLogout = async () => {
             )}
 
             {page === "publisher" && (
-              <motion.main key="publisher" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                <PublisherPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+              <motion.main
+                key="publisher"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <PublisherPage
+                  onNavigate={(p) => {
+                    setPage(p);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
                 <Footer onNavigate={setPage} categories={categories} />
               </motion.main>
             )}
 
             {page === "team" && (
-              <motion.main key="team" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                <TeamPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+              <motion.main
+                key="team"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <TeamPage
+                  onNavigate={(p) => {
+                    setPage(p);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
                 <Footer onNavigate={setPage} categories={categories} />
               </motion.main>
             )}
 
             {page === "about" && (
-              <motion.main key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                <AboutPage onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+              <motion.main
+                key="about"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <AboutPage
+                  onNavigate={(p) => {
+                    setPage(p);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
                 <Footer onNavigate={setPage} categories={categories} />
               </motion.main>
             )}
 
             {page === "favorites" && (
-              <motion.main key="favorites" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <motion.main
+                key="favorites"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 <FavoritesPage
                   authUser={authUser}
                   onProductClick={handleProductClick}
                   onWishlistToggle={handleWishlistToggle}
-                  onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onNavigate={(p) => {
+                    setPage(p);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                   products={products}
                 />
                 <Footer onNavigate={setPage} categories={categories} />
@@ -5193,23 +8272,45 @@ const handleLogout = async () => {
             )}
 
             {page === "admin" && (
-              <motion.main key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+              <motion.main
+                key="admin"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 <AdminPage
                   authUser={authUser}
-                  onNavigate={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onNavigate={(p) => {
+                    setPage(p);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  categories={categories}
                 />
               </motion.main>
             )}
 
             {/* Redirect unauthenticated profile access */}
             {page === "profile" && !authUser && (
-              <motion.main key="profile-redirect" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
-                className="min-h-screen flex items-center justify-center">
+              <motion.main
+                key="profile-redirect"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-screen flex items-center justify-center"
+              >
                 <div className="text-center">
-                  <h2 className="text-2xl font-display font-bold text-foreground mb-3">Sign in to view your profile</h2>
-                  <p className="text-muted-foreground mb-6">Create a free account to save your resources.</p>
-                  <button onClick={() => setAuthModal("login")}
-                    className="px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity">
+                  <h2 className="text-2xl font-display font-bold text-foreground mb-3">
+                    Sign in to view your profile
+                  </h2>
+                  <p className="text-muted-foreground mb-6">
+                    Create a free account to save your resources.
+                  </p>
+                  <button
+                    onClick={() => setAuthModal("login")}
+                    className="px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity"
+                  >
                     Sign In
                   </button>
                 </div>
@@ -5221,4 +8322,3 @@ const handleLogout = async () => {
     </AnimatePresence>
   );
 }
-
