@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-
-export { GiftSettingsPanel };
 function GiftSettingsPanel() {
   const [form, setForm] = useState({
     title: "",
@@ -179,3 +177,5 @@ function GiftSettingsPanel() {
     </div>
   );
 }
+
+export { GiftSettingsPanel };
