@@ -2,9 +2,6 @@ import React, { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle, Layers } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-
-export { CategoriesAdminPanel };
-
 function CategoriesAdminPanel() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -421,3 +418,5 @@ function CategoriesAdminPanel() {
     </div>
   );
 }
+
+export { CategoriesAdminPanel };
