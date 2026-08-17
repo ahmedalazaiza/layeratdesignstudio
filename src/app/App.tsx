@@ -1411,12 +1411,41 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
   const [step, setStep] = useState<"form" | "success">("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [giftConfig, setGiftConfig] = useState({
+    title: "Free Figma Starter Kit",
+    description: "50+ components · 3 themes · Variables-ready",
+    image_url: "",
+    download_url: "",
+    file_name: "gift-file.fig",
+    is_active: true,
+  });
 
   useEffect(() => {
+    const loadGift = async () => {
+      const { data } = await supabase
+        .from("gift_settings")
+        .select("*")
+        .eq("id", 1)
+        .maybeSingle();
+      if (data) {
+        setGiftConfig({
+          title: data.title || "",
+          description: data.description || "",
+          image_url: data.image_url || "",
+          download_url: data.download_url || "",
+          file_name: data.file_name || "gift-file.fig",
+          is_active: data.is_active ?? true,
+        });
+      }
+    };
+    loadGift();
+  }, []);
+  useEffect(() => {
     if (!scrollReady) return;
-    if (authUser) return;
+    if (!giftConfig.is_active) return;
 
     const stored = localStorage.getItem(GIFT_KEY);
     if (stored) {
@@ -1440,52 +1469,85 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || !password.trim()) return;
     setLoading(true);
     setError("");
 
     try {
-      /*
-       * TODO: Replace simulation with real API call:
-       * POST ${API_BASE}/auth/gift-register
-       * body: { name, email }
-       * resp: { user: AuthUser, token: string, downloadUrl: string }
-       *
-       * Backend should:
-       *   1. Find or create user by email (auto-generate temp password, email it)
-       *   2. Add GIFT_CONFIG.productId to user.purchases
-       *   3. Return a signed, time-limited downloadUrl for the gift file
-       */
-      await new Promise((r) => setTimeout(r, 1100));
-
-      const giftUser: AuthUser = {
-        id: `u_${Date.now()}`,
-        name: name.trim() || email.split("@")[0],
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim(),
-        role: "user",
-        purchases: [GIFT_CONFIG.productId],
-        wishlist: [],
-        createdAt: new Date().toISOString(),
-      };
+        password,
+        options: {
+          data: {
+            full_name: name.trim() || email.split("@")[0],
+          },
+        },
+      });
 
-      localStorage.setItem("ld_token", "simulated_token_gift");
-      localStorage.setItem("ld_user", JSON.stringify(giftUser));
-      localStorage.setItem(
-        GIFT_KEY,
-        JSON.stringify({ ts: Date.now(), action: "claimed" })
+      if (signUpError) throw signUpError;
+
+      await supabase.from("leads").upsert(
+        {
+          email: email.trim(),
+          source: "gift_popup",
+          gift_downloaded: true,
+        },
+        { onConflict: "email" }
       );
 
-      onSuccess(giftUser);
-      setStep("success");
+      if (data.user && !data.session) {
+        // حساب اتعمل وبانتظار تأكيد الإيميل — برضو ندي رابط الهدية
+        setStep("success");
+        if (giftConfig.download_url) {
+          const a = document.createElement("a");
+          a.href = giftConfig.download_url;
+          a.download = giftConfig.file_name || "gift-file";
+          a.target = "_blank";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        localStorage.setItem(
+          GIFT_KEY,
+          JSON.stringify({ ts: Date.now(), action: "claimed" })
+        );
+        setLoading(false);
+        return;
+      }
 
-      const a = document.createElement("a");
-      a.href = GIFT_CONFIG.downloadUrl;
-      a.download = GIFT_CONFIG.fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (data.user && data.session) {
+        const newUser: AuthUser = {
+          id: data.user.id,
+          name:
+            name.trim() ||
+            data.user.user_metadata?.full_name ||
+            email.split("@")[0],
+          email: data.user.email || email.trim(),
+          role: "user",
+          purchases: [],
+          wishlist: [],
+          createdAt: data.user.created_at || new Date().toISOString(),
+        };
 
-      setTimeout(() => setVisible(false), 4500);
+        localStorage.setItem(
+          GIFT_KEY,
+          JSON.stringify({ ts: Date.now(), action: "claimed" })
+        );
+
+        onSuccess(newUser);
+        setStep("success");
+
+        if (giftConfig.download_url) {
+          const a = document.createElement("a");
+          a.href = giftConfig.download_url;
+          a.download = giftConfig.file_name || "gift-file";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+
+        setTimeout(() => setVisible(false), 4500);
+      }
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -1522,7 +1584,10 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
             {/* ── LEFT: Image panel ──────────────────────────────────────── */}
             <div className="relative sm:w-[42%] min-h-[220px] sm:min-h-[520px] overflow-hidden hidden sm:block">
               <img
-                src="https://images.unsplash.com/photo-1637944059054-7091ca8efe14?w=600&q=80&fit=crop&crop=center"
+                src={
+                  giftConfig.image_url ||
+                  "https://images.unsplash.com/photo-1637944059054-7091ca8efe14?w=600&q=80&fit=crop&crop=center"
+                }
                 alt="Design workspace"
                 className="absolute inset-0 w-full h-full object-cover"
               />
@@ -1555,26 +1620,24 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
                   {/* Header */}
                   <div className="mb-7">
                     <h2 className="text-2xl font-display font-bold text-foreground leading-snug mb-3">
-                      There's a free gift
-                      <br />
-                      waiting for you!
+                      {giftConfig.title ||
+                        "There's a free gift waiting for you!"}
                     </h2>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Register with your email and get{" "}
-                      <span className="font-semibold text-foreground">
-                        {GIFT_CONFIG.title}
-                      </span>{" "}
-                      added to your library instantly — no credit card needed.
+                      {giftConfig.description ||
+                        "Register with your email and get this free resource added to your library instantly — no credit card needed."}
                     </p>
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {GIFT_CONFIG.description.split(" · ").map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-[11px] text-primary font-medium bg-primary/8 border border-primary/15 px-2.5 py-1 rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      {(giftConfig.description || GIFT_CONFIG.description)
+                        .split(" · ")
+                        .map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[11px] text-primary font-medium bg-primary/8 border border-primary/15 px-2.5 py-1 rounded-full"
+                          >
+                            {tag}
+                          </span>
+                        ))}
                     </div>
                   </div>
 
@@ -1607,6 +1670,20 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
                         onChange={(e) => setEmail(e.target.value)}
                         className={inputCls}
                       />
+                      <div>
+                        <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Create a password"
+                          minLength={6}
+                          required
+                          className={inputCls}
+                        />
+                      </div>
                     </div>
 
                     {error && (
@@ -1644,7 +1721,7 @@ function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 280, damping: 18 }}
-                    className="w-[72px] h-[72px] mx-auto mb-5 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center"
+                    className="w-[72px] h-[72px] mx-auto mb-5 rounded-full bg-primary/15 border border-primary/40 flex items-center justify-center"
                   >
                     <CheckCircle size={32} className="text-accent" />
                   </motion.div>
@@ -4090,9 +4167,12 @@ function ProfilePage({
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwOtp, setPwOtp] = useState("");
+  const [pwStep, setPwStep] = useState<"form" | "otp">("form");
   const [pwStatus, setPwStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const [pwErrorMsg, setPwErrorMsg] = useState("");
   const [libraryProducts, setLibraryProducts] = useState<Product[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(true);
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
@@ -4206,23 +4286,75 @@ function ProfilePage({
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwForm.next !== pwForm.confirm) {
-      setPwStatus("error");
-      return;
+    setPwErrorMsg("");
+
+    // خطوة 1: التحقق من الباسورد الحالي وإرسال OTP
+    if (pwStep === "form") {
+      if (pwForm.next !== pwForm.confirm) {
+        setPwStatus("error");
+        setPwErrorMsg("New password and confirmation do not match.");
+        return;
+      }
+      if (pwForm.next.length < 6) {
+        setPwStatus("error");
+        setPwErrorMsg("New password must be at least 6 characters.");
+        return;
+      }
+
+      setPwStatus("saving");
+      try {
+        // تأكيد الباسورد الحالي
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: authUser.email,
+          password: pwForm.current,
+        });
+        if (signInError) {
+          console.error("Current password check failed:", signInError);
+          setPwStatus("error");
+          setPwErrorMsg(signInError.message || "Current password is incorrect.");
+          return;
+        }
+
+        // إرسال OTP على الإيميل
+        const { error: otpError } = await supabase.auth.signInWithOtp({
+          email: authUser.email,
+          options: { shouldCreateUser: false },
+        });
+        if (otpError) throw otpError;
+
+        setPwStep("otp");
+        setPwStatus("idle");
+      } catch (err: any) {
+        console.error("Password change error:", err);
+        setPwStatus("error");
+        setPwErrorMsg(err?.message || "Something went wrong.");
+      }
     }
-    setPwStatus("saving");
-    try {
-      /*
-       * POST ${API_BASE}/auth/password
-       * body: { currentPassword: pwForm.current, newPassword: pwForm.next }
-       * header: Authorization: Bearer <token>
-       */
-      await new Promise((r) => setTimeout(r, 900));
-      setPwStatus("saved");
-      setPwForm({ current: "", next: "", confirm: "" });
-      setTimeout(() => setPwStatus("idle"), 2500);
-    } catch {
-      setPwStatus("error");
+
+    // خطوة 2: التحقق من OTP ثم تغيير الباسورد
+    if (pwStep === "otp") {
+      setPwStatus("saving");
+      try {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          email: authUser.email,
+          token: pwOtp.trim(),
+          type: "email",
+        });
+        if (verifyError) throw verifyError;
+
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: pwForm.next,
+        });
+        if (updateError) throw updateError;
+
+        setPwStatus("saved");
+        setPwForm({ current: "", next: "", confirm: "" });
+        setPwOtp("");
+        setPwStep("form");
+        setTimeout(() => setPwStatus("idle"), 2500);
+      } catch {
+        setPwStatus("error");
+      }
     }
   };
 
@@ -4578,25 +4710,40 @@ function ProfilePage({
                       />
                     </div>
                     {pwStatus === "error" && (
-                      <p className="text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3 flex items-center gap-2">
-                        <AlertCircle size={14} /> Passwords do not match or
-                        current password is wrong.
+                      <p className="text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-destructive/20 border border-red-200 dark:border-destructive/30 rounded-xl px-4 py-3">
+                        {pwErrorMsg ||
+                          "Passwords do not match or current password is wrong."}
                       </p>
+                    )}
+                    {pwStep === "otp" && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide">
+                          Email verification code
+                        </label>
+                        <input
+                          value={pwOtp}
+                          onChange={(e) => setPwOtp(e.target.value)}
+                          placeholder="Enter the code from your email"
+                          className={inputClass}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          We sent a verification code to {authUser.email}
+                        </p>
+                      </div>
                     )}
                     <button
                       type="submit"
                       disabled={pwStatus === "saving"}
                       className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all duration-300"
                     >
-                      {pwStatus === "saving" ? (
-                        "Updating..."
-                      ) : pwStatus === "saved" ? (
-                        <>
-                          <CheckCircle size={15} /> Updated!
-                        </>
-                      ) : (
-                        "Update Password"
-                      )}
+                      {pwStatus === "saving"
+                        ? "Please wait..."
+                        : pwStatus === "saved"
+                        ? "Password updated"
+                        : pwStep === "otp"
+                        ? "Verify & Update Password"
+                        : "Send verification code"}
                     </button>
                   </form>
                 </div>
@@ -4729,6 +4876,7 @@ function PublisherPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
     } catch (err: any) {
       console.error("Publisher application error:", err);
       setStatus("error");
+      
     }
   };
 
@@ -6262,6 +6410,182 @@ function SetNewPasswordModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
+function GiftSettingsPanel() {
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    image_url: "",
+    download_url: "",
+    file_name: "",
+    is_active: true,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("gift_settings")
+        .select("*")
+        .eq("id", 1)
+        .maybeSingle();
+      if (!error && data) {
+        setForm({
+          title: data.title || "",
+          description: data.description || "",
+          image_url: data.image_url || "",
+          download_url: data.download_url || "",
+          file_name: data.file_name || "",
+          is_active: data.is_active ?? true,
+        });
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+    const { error } = await supabase.from("gift_settings").upsert({
+      id: 1,
+      title: form.title,
+      description: form.description,
+      image_url: form.image_url || null,
+      download_url: form.download_url || null,
+      file_name: form.file_name || null,
+      is_active: form.is_active,
+      updated_at: new Date().toISOString(),
+    });
+    setSaving(false);
+    setMessage(error ? error.message : "Gift settings saved.");
+  };
+
+  const inputCls =
+    "w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+  if (loading) {
+    return (
+      <div className="p-8 text-muted-foreground">Loading gift settings...</div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 max-w-2xl">
+      <h2 className="text-lg font-display font-bold text-foreground mb-1">
+        Gift Popup Settings
+      </h2>
+      <p className="text-xs text-muted-foreground mb-6">
+        Control the gift shown to visitors: title, description, image, and
+        download link.
+      </p>
+
+      <form onSubmit={handleSave} className="space-y-4">
+        <div>
+          <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+            Title
+          </label>
+          <input
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            className={inputCls}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+            Description
+          </label>
+          <textarea
+            value={form.description}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, description: e.target.value }))
+            }
+            rows={3}
+            className={`${inputCls} resize-none`}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+            Image URL
+          </label>
+          <input
+            value={form.image_url}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, image_url: e.target.value }))
+            }
+            placeholder="https://..."
+            className={inputCls}
+          />
+          {form.image_url && (
+            <img
+              src={form.image_url}
+              alt=""
+              className="mt-3 w-full max-w-sm h-40 object-cover rounded-xl border border-border"
+            />
+          )}
+        </div>
+
+        <div>
+          <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+            Download URL
+          </label>
+          <input
+            value={form.download_url}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, download_url: e.target.value }))
+            }
+            placeholder="https://..."
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+            File Name
+          </label>
+          <input
+            value={form.file_name}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, file_name: e.target.value }))
+            }
+            placeholder="gift.fig"
+            className={inputCls}
+          />
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={form.is_active}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, is_active: e.target.checked }))
+            }
+          />
+          Gift popup is active
+        </label>
+
+        {message && (
+          <div className="text-sm text-muted-foreground bg-muted/40 rounded-xl px-4 py-3">
+            {message}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60"
+        >
+          {saving ? "Saving..." : "Save Gift Settings"}
+        </button>
+      </form>
+    </div>
+  );
+}
 
 function PublisherApplicationsPanel() {
   const [apps, setApps] = useState<any[]>([]);
@@ -7508,9 +7832,10 @@ function AdminPage({
   onNavigate: (p: Page) => void;
   categories: Category[];
 }) {
-  const [tab, setTab] = useState<"products" | "categories" | "publishers">(
-    "products"
-  );
+  const [tab, setTab] = useState<
+    "products" | "categories" | "publishers" | "gift"
+  >("products");
+  ("products");
 
   // حماية: مش أدمن → يرجع للـ home
   if (!authUser || authUser.role !== "admin") {
@@ -7552,6 +7877,7 @@ function AdminPage({
             { id: "products" as const, label: "Products" },
             { id: "categories" as const, label: "Categories" },
             { id: "publishers" as const, label: "Publisher Applications" },
+            { id: "gift" as const, label: "Gift Popup" },
           ].map((t) => (
             <button
               key={t.id}
@@ -7571,6 +7897,7 @@ function AdminPage({
         {tab === "products" && <ProductsAdminPanel categories={categories} />}
         {tab === "categories" && <CategoriesAdminPanel />}
         {tab === "publishers" && <PublisherApplicationsPanel />}
+        {tab === "gift" && <GiftSettingsPanel />}
       </div>
     </main>
   );
