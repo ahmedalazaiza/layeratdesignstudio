@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
-import App from "./app/App.tsx";
+import App from "./app/App";
 import "./styles/index.css";
 
 // Global error listener to catch any syntax or initialization runtime crash
