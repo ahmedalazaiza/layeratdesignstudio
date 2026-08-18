@@ -770,14 +770,32 @@ const PRODUCTS: Product[] = [
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
-function useScrollY() {
-  const [y, setY] = useState(0);
+function useScrollY(enabled: boolean = true) {
+  const [scrollY, setScrollY] = useState(0);
+
   useEffect(() => {
-    const handler = () => setY(window.scrollY);
-    window.addEventListener("scroll", handler, { passive: true });
-    return () => window.removeEventListener("scroll", handler);
-  }, []);
-  return y;
+    if (!enabled) {
+      setScrollY(0);
+      return;
+    }
+
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrollY(window.scrollY);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [enabled]);
+
+  return scrollY;
 }
 
 function useCountUp(target: number, inView: boolean, duration = 1800) {
@@ -941,7 +959,7 @@ function Navbar({
   onCategoryClick,
   activeCategoryId,
 }: NavbarProps) {
-  const scrollY = useScrollY();
+  const scrollY = useScrollY(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -969,10 +987,12 @@ function Navbar({
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        solid ? "bg-background/90 backdrop-blur-xl border-b border-border" : ""
-      }`}
-    >
+  className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b ${
+    solid
+      ? "bg-background/90 backdrop-blur-xl border-border"
+      : "bg-transparent border-transparent"
+  }`}
+>
       <div className="max-w-7xl mx-auto px-4 lg:px-10 flex items-center justify-between h-16 lg:h-20 gap-4">
         {/* Logo */}
         <button
