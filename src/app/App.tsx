@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
+import { useTheme } from "next-themes";
 import { supabase } from "../lib/supabase";
 import { Navbar } from "../components/layout/Navbar";
 import { HomePage } from "../pages/HomePage";
@@ -41,68 +42,24 @@ const AdminDashboardLayout = React.lazy(() =>
 export type ThemeMode = "light" | "dark" | "system";
 
 export function App() {
-  // Theme State: "light" | "dark" | "system"
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-    try {
-      if (typeof window !== "undefined" && window.localStorage) {
-        const saved = localStorage.getItem("layerat_theme_mode");
-        if (saved === "light" || saved === "dark" || saved === "system") {
-          return saved as ThemeMode;
-        }
-        const legacy = localStorage.getItem("layerat_theme");
-        if (legacy === "dark") return "dark";
-        if (legacy === "light") return "light";
-      }
-    } catch {}
-    return "system";
-  });
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  const [systemIsDark, setSystemIsDark] = useState<boolean>(() => {
-    try {
-      if (typeof window !== "undefined" && window.matchMedia) {
-        return window.matchMedia("(prefers-color-scheme: dark)").matches;
-      }
-    } catch {}
-    return false;
-  });
-
-  // Listen to OS system theme changes
   useEffect(() => {
-    try {
-      if (typeof window === "undefined" || !window.matchMedia) return;
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = (e: MediaQueryListEvent) => setSystemIsDark(e.matches);
-      mediaQuery.addEventListener("change", handler);
-      return () => mediaQuery.removeEventListener("change", handler);
-    } catch {}
+    setMounted(true);
   }, []);
 
-  // Compute resolved dark mode boolean
-  const isDark = useMemo(() => {
-    if (themeMode === "dark") return true;
-    if (themeMode === "light") return false;
-    return systemIsDark;
-  }, [themeMode, systemIsDark]);
-
-  // Apply dark class to document root & persist
-  useEffect(() => {
-    try {
-      const root = document.documentElement;
-      if (isDark) {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
-      localStorage?.setItem?.("layerat_theme_mode", themeMode);
-    } catch {}
-  }, [isDark, themeMode]);
+  // Compute resolved dark mode boolean from next-themes package
+  const isDark = mounted ? resolvedTheme === "dark" : true;
+  const themeMode = ((mounted ? theme : "system") as ThemeMode) || "system";
 
   const handleThemeChange = (mode: ThemeMode) => {
-    setThemeMode(mode);
+    setTheme(mode);
   };
 
-  const toggleTheme = () =>
-    handleThemeChange(isDark ? "light" : "dark");
+  const toggleTheme = () => {
+    setTheme(isDark ? "light" : "dark");
+  };
 
   // Initial Full Screen Loading State
   const [initialLoading, setInitialLoading] = useState(true);

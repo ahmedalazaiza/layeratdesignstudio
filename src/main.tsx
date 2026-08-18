@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "next-themes";
 import App from "./app/App.tsx";
 import "./styles/index.css";
 
@@ -96,7 +97,14 @@ const rootEl = document.getElementById("root");
 if (rootEl) {
   createRoot(rootEl).render(
     <ErrorBoundary>
-      <App />
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        storageKey="layerat_theme_mode"
+      >
+        <App />
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
