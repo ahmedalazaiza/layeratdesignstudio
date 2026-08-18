@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import App from "./app/App";
 import "./styles/index.css";
@@ -48,39 +49,41 @@ class ErrorBoundary extends React.Component<
           <div style={{
             maxWidth: "600px",
             backgroundColor: "#0d1410",
-            border: "1px solid rgba(170, 255, 56, 0.2)",
+            border: "1px solid #1a261c",
             borderRadius: "24px",
             padding: "32px",
-            boxShadow: "0 20px 50px rgba(0,0,0,0.5)"
+            boxShadow: "0 20px 40px rgba(0,0,0,0.5)"
           }}>
-            <h1 style={{ color: "#aaff38", fontSize: "24px", margin: "0 0 12px 0" }}>
-              Layerat Design Studio
-            </h1>
-            <p style={{ color: "#6b8c72", fontSize: "14px", margin: "0 0 20px 0" }}>
-              A client-side initialization issue occurred.
+            <div style={{
+              width: "48px",
+              height: "48px",
+              backgroundColor: "rgba(255, 68, 68, 0.1)",
+              borderRadius: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+              color: "#ff4444",
+              fontWeight: "bold",
+              fontSize: "20px"
+            }}>!</div>
+            <h2 style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "8px" }}>
+              Something went wrong
+            </h2>
+            <p style={{ color: "#8a9e8e", fontSize: "14px", marginBottom: "24px" }}>
+              An error occurred while loading this view. You can reload the studio to restore your session.
             </p>
-            <pre style={{
-              background: "#162018",
-              color: "#fca5a5",
-              padding: "16px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              textAlign: "left",
-              overflowX: "auto"
-            }}>
-              {this.state.error?.message || "Unknown error"}
-            </pre>
             <button
               onClick={() => window.location.reload()}
               style={{
-                marginTop: "20px",
-                padding: "12px 24px",
-                borderRadius: "12px",
                 backgroundColor: "#aaff38",
                 color: "#080c09",
                 border: "none",
                 fontWeight: "bold",
-                cursor: "pointer"
+                cursor: "pointer",
+                padding: "10px 24px",
+                borderRadius: "12px",
+                fontSize: "14px"
               }}
             >
               Reload Studio
@@ -103,7 +106,9 @@ if (rootEl) {
         enableSystem
         storageKey="layerat_theme_mode"
       >
-        <App />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
       </ThemeProvider>
     </ErrorBoundary>
   );
