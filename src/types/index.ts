@@ -8,6 +8,8 @@ export type Page =
   | "publisher"
   | "team"
   | "about"
+  | "terms"
+  | "privacy"
   | "favorites"
   | "admin";
 
@@ -26,6 +28,25 @@ export interface Category {
   subcategories: Subcategory[];
 }
 
+export interface ProductSpecifications {
+  fileSize: string;
+  format: string[];
+  screens: number;
+  components: number;
+  version: string;
+  compatibility: string[];
+  supportsVariables: boolean;
+  supportsAutoLayout: boolean;
+  supportsLightDark: boolean;
+}
+
+export interface ProductLicense {
+  type: "personal" | "commercial";
+  allowCommercial: boolean;
+  allowUnlimitedProjects: boolean;
+  attributionRequired: boolean;
+}
+
 export interface Product {
   id: string;
   title: string;
@@ -34,28 +55,39 @@ export interface Product {
   fullDescription: string;
   price: number;
   discountPrice?: number;
-  currency: string;
+  currency?: string;
   isFree: boolean;
   thumbnail: string;
-  galleryImages: string[];
+  galleryImages?: string[];
   figmaPreviewUrl?: string;
   categoryId: string;
-  subcategoryId: string;
-  tags: string[];
-  fileSize: string;
-  formats: string[];
-  screensCount: number;
-  componentsCount: number;
-  version: string;
-  supportsVariables: boolean;
-  supportsAutoLayout: boolean;
-  supportsLightDark: boolean;
-  licenseType: "personal" | "commercial";
-  downloadsCount: number;
-  viewsCount: number;
+  subcategoryId?: string;
+  tags?: string[];
+  fileSize?: string;
+  formats?: string[];
+  screensCount?: number;
+  componentsCount?: number;
+  version?: string;
+  supportsVariables?: boolean;
+  supportsAutoLayout?: boolean;
+  supportsLightDark?: boolean;
+  licenseType?: "personal" | "commercial";
+  downloadsCount?: number;
+  viewsCount?: number;
   rating: number;
-  reviewsCount: number;
-  downloadFileUrl: string;
+  reviewsCount?: number;
+  downloadFileUrl?: string;
+
+  // Compatibility fields
+  downloads?: number;
+  views?: number;
+  featured?: boolean;
+  trending?: boolean;
+  isNew?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  specifications?: ProductSpecifications;
+  license?: ProductLicense;
 }
 
 export interface AuthUser {
@@ -69,6 +101,19 @@ export interface AuthUser {
   purchases: string[];
   wishlist: string[];
   createdAt: string;
+  isVerified?: boolean;
+}
+
+export interface ProductReview {
+  id: string;
+  productId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  rating: number;
+  reviewText: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface BrowseFilters {
@@ -76,5 +121,5 @@ export interface BrowseFilters {
   categoryId: string | null;
   subcategoryId: string | null;
   isFree: boolean | null;
-  sortBy: "newest" | "downloads" | "rating" | "price-asc" | "price-desc";
+  sortBy: "newest" | "downloads" | "rating" | "alphabetical";
 }
