@@ -4,37 +4,7 @@ import { CategoriesAdminPanel } from "./CategoriesAdminPanel";
 import { PublisherApplicationsPanel } from "./PublisherApplicationsPanel";
 import { GiftSettingsPanel } from "./GiftSettingsPanel";
 
-type Page =
-  | "home"
-  | "browse"
-  | "product"
-  | "profile"
-  | "admin"
-  | "publisher"
-  | "about"
-  | "favorites"
-  | "team";
-
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "user" | "admin" | "creator";
-  purchases: string[];
-  wishlist: string[];
-  createdAt: string;
-  bio?: string;
-  website?: string;
-};
-
-type Category = {
-  id: string;
-  name: string;
-  slug: string;
-  icon?: any;
-  color?: string;
-  subcategories?: { id: string; name: string; slug: string }[];
-};
+import type { Page, AuthUser, Category } from "../../types";
 
 function AdminPage({
   authUser,

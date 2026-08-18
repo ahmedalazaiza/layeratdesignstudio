@@ -2,18 +2,8 @@ import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, CheckCircle, Mail, X, Eye, EyeOff } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import type { AuthUser } from "../../types";
 
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "user" | "admin" | "creator";
-  purchases: string[];
-  wishlist: string[];
-  createdAt: string;
-  bio?: string;
-  website?: string;
-};
 
 interface AuthModalProps {
   mode: "login" | "register" | "forgot_password";

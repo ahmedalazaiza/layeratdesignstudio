@@ -1,16 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle, ChevronDown } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import type { Category } from "../../types";
 
-// مؤقتًا لحد ما نفصل الـ types
-type Category = {
-  id: string;
-  name: string;
-  slug: string;
-  icon?: any;
-  color?: string;
-  subcategories?: { id: string; name: string; slug: string }[];
-};
 
 function ProductsAdminPanel({ categories }: { categories: Category[] }) {
     const [products, setProducts] = useState<any[]>([]);

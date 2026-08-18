@@ -2,16 +2,8 @@ import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, X, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import type { AuthUser } from "../../types";
 
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "user" | "admin" | "creator";
-  purchases: string[];
-  wishlist: string[];
-  createdAt: string;
-};
 
 // ─── Gift Popup ───────────────────────────────────────────────────────────────
 
