@@ -1,7 +1,6 @@
 import React from "react";
 import { ChevronLeft } from "lucide-react";
 import type { Page, Category } from "../../types";
-
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
 function Footer({
@@ -140,4 +139,4 @@ function Footer({
     );
   }
   
-  export { Footer };  
+  export { Footer };
