@@ -123,7 +123,6 @@ function Footer({
                     to={`/browse?category=${encodeURIComponent(cat.slug || cat.id)}`}
                     onClick={() => {
                       if (onCategoryClick) onCategoryClick(cat.id);
-                      scrollToTop();
                     }}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
@@ -149,7 +148,6 @@ function Footer({
                 <li key={label}>
                   <Link
                     to={to}
-                    onClick={scrollToTop}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {label}
@@ -175,7 +173,6 @@ function Footer({
                 <li key={label}>
                   <Link
                     to={to}
-                    onClick={scrollToTop}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {label}
