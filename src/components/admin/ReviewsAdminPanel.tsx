@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { toast } from "sonner";
+import { CustomSelect } from "../ui/CustomSelect";
 import type { Product, AuthUser } from "../../types";
 
 interface ReviewsAdminPanelProps {
@@ -223,32 +224,30 @@ export function ReviewsAdminPanel({
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Product Filter */}
-          <select
+          <CustomSelect
             value={productFilter}
-            onChange={(e) => setProductFilter(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-border bg-background text-foreground focus:outline-none focus:border-primary/60 cursor-pointer font-mono"
-          >
-            <option value="all">All Products</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setProductFilter(val)}
+            options={[
+              { value: "all", label: "All Products" },
+              ...products.map((p) => ({ value: p.id, label: p.title })),
+            ]}
+            className="w-56 text-xs font-mono"
+          />
 
           {/* Rating Filter */}
-          <select
+          <CustomSelect
             value={ratingFilter}
-            onChange={(e) => setRatingFilter(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-border bg-background text-foreground focus:outline-none focus:border-primary/60 cursor-pointer font-mono"
-          >
-            <option value="all">All Ratings</option>
-            <option value="5">5 Stars ⭐⭐⭐⭐⭐</option>
-            <option value="4">4 Stars ⭐⭐⭐⭐</option>
-            <option value="3">3 Stars ⭐⭐⭐</option>
-            <option value="2">2 Stars ⭐⭐</option>
-            <option value="1">1 Star ⭐</option>
-          </select>
+            onChange={(val) => setRatingFilter(val)}
+            options={[
+              { value: "all", label: "All Ratings" },
+              { value: "5", label: "5 Stars ⭐⭐⭐⭐⭐" },
+              { value: "4", label: "4 Stars ⭐⭐⭐⭐" },
+              { value: "3", label: "3 Stars ⭐⭐⭐" },
+              { value: "2", label: "2 Stars ⭐⭐" },
+              { value: "1", label: "1 Star ⭐" },
+            ]}
+            className="w-48 text-xs font-mono"
+          />
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { toast } from "sonner";
+import { CustomSelect } from "../ui/CustomSelect";
 import type { AuthUser } from "../../types";
 
 export function UsersAdminPanel({
@@ -195,28 +196,30 @@ export function UsersAdminPanel({
           </div>
 
           {/* Provider Filter */}
-          <select
+          <CustomSelect
             value={providerFilter}
-            onChange={(e) => setProviderFilter(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-border bg-card text-foreground focus:outline-none focus:border-primary/60 cursor-pointer font-mono"
-          >
-            <option value="all">All Providers</option>
-            <option value="google">Google OAuth</option>
-            <option value="facebook">Facebook OAuth</option>
-            <option value="email">Email & Password</option>
-          </select>
+            onChange={(val) => setProviderFilter(val)}
+            options={[
+              { value: "all", label: "All Providers" },
+              { value: "google", label: "Google OAuth" },
+              { value: "facebook", label: "Facebook OAuth" },
+              { value: "email", label: "Email & Password" },
+            ]}
+            className="w-48 text-xs font-mono"
+          />
 
           {/* Role Filter */}
-          <select
+          <CustomSelect
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-border bg-card text-foreground focus:outline-none focus:border-primary/60 cursor-pointer font-mono"
-          >
-            <option value="all">All Roles ({users.length})</option>
-            <option value="user">Standard Users</option>
-            <option value="creator">Creators / Publishers</option>
-            <option value="admin">Administrators</option>
-          </select>
+            onChange={(val) => setRoleFilter(val)}
+            options={[
+              { value: "all", label: `All Roles (${users.length})` },
+              { value: "user", label: "Standard Users" },
+              { value: "creator", label: "Creators / Publishers" },
+              { value: "admin", label: "Administrators" },
+            ]}
+            className="w-52 text-xs font-mono"
+          />
         </div>
       </div>
 

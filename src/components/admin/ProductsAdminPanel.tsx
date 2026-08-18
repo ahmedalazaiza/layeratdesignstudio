@@ -1131,18 +1131,15 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                 />
               </div>
 
-              <select
+              <CustomSelect
                 value={selectedCategoryFilter}
-                onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs rounded-xl border border-border bg-background text-foreground focus:outline-none focus:border-primary/60 font-mono cursor-pointer"
-              >
-                <option value="all">All</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedCategoryFilter(val)}
+                options={[
+                  { value: "all", label: "All Categories" },
+                  ...categories.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                className="w-40 text-xs font-mono"
+              />
             </div>
           </div>
 

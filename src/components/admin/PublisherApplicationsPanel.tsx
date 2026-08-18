@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { toast } from "sonner";
+import { CustomSelect } from "../ui/CustomSelect";
 
 export function PublisherApplicationsPanel() {
   const [apps, setApps] = useState<any[]>([]);
@@ -131,16 +132,17 @@ export function PublisherApplicationsPanel() {
           </div>
 
           {/* Status Filter */}
-          <select
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-border bg-card text-foreground focus:outline-none focus:border-primary/60 cursor-pointer"
-          >
-            <option value="all">All Statuses ({apps.length})</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
+            onChange={(val) => setStatusFilter(val)}
+            options={[
+              { value: "all", label: `All Statuses (${apps.length})` },
+              { value: "pending", label: "Pending" },
+              { value: "approved", label: "Approved" },
+              { value: "rejected", label: "Rejected" },
+            ]}
+            className="w-48 text-xs font-mono"
+          />
         </div>
       </div>
 
