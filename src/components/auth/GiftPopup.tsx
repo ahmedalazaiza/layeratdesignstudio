@@ -55,21 +55,35 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
     loadGift();
   }, []);
 
+  // Listen for manual trigger events (e.g. from Notification Center or Navbar)
   useEffect(() => {
-    if (!scrollReady) return;
-    if (!giftConfig.is_active) return;
+    const handleOpen = () => {
+      setStep("form");
+      setVisible(true);
+    };
+    window.addEventListener("layerat_open_gift", handleOpen);
+    return () => window.removeEventListener("layerat_open_gift", handleOpen);
+  }, []);
 
-    // If user is already logged in and verified, don't nag with gift popup
+  useEffect(() => {
+    if (!giftConfig.is_active) return;
     if (authUser?.isVerified) return;
 
     const stored = localStorage.getItem(GIFT_KEY);
     if (stored) {
-      const { ts, action } = JSON.parse(stored);
-      if (action === "claimed") return;
-      if (Date.now() - ts < GIFT_COOLDOWN_MS) return;
+      try {
+        const { ts, action } = JSON.parse(stored);
+        if (action === "claimed") return;
+        // If dismissed recently (within 24 hours), don't auto-pop
+        if (Date.now() - ts < 24 * 60 * 60 * 1000) return;
+      } catch {}
     }
 
-    const timer = setTimeout(() => setVisible(true), 800);
+    // Trigger after 2.5s for new guest visitors or when scrollReady is true
+    const timer = setTimeout(() => {
+      setVisible(true);
+    }, scrollReady ? 600 : 2500);
+
     return () => clearTimeout(timer);
   }, [scrollReady, authUser, giftConfig.is_active]);
 

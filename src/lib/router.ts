@@ -35,6 +35,10 @@ export function getRouteTitle(route: RouteState, product?: Product | null): stri
       return `About Us & Mission — ${SITE_NAME}`;
     case "team":
       return `Our Creative Team — ${SITE_NAME}`;
+    case "terms":
+      return `Terms & Conditions — ${SITE_NAME}`;
+    case "privacy":
+      return `Privacy Policy — ${SITE_NAME}`;
     case "profile":
       return `My Profile & Account Settings — ${SITE_NAME}`;
     case "admin":
@@ -99,7 +103,16 @@ export function parseCurrentRoute(): RouteState {
     return { page: "team" };
   }
 
-  // 8. Profile
+  // 8. Terms & Privacy
+  if (pathname === "/terms" || pathname === "/terms-of-service") {
+    return { page: "terms" };
+  }
+
+  if (pathname === "/privacy" || pathname === "/privacy-policy") {
+    return { page: "privacy" };
+  }
+
+  // 9. Profile
   if (pathname === "/profile" || pathname === "/account") {
     return { page: "profile" };
   }
@@ -135,6 +148,10 @@ export function buildRouteUrl(route: RouteState): string {
       return "/about";
     case "team":
       return "/team";
+    case "terms":
+      return "/terms";
+    case "privacy":
+      return "/privacy";
     case "profile":
       return "/profile";
     case "admin":

@@ -26,6 +26,15 @@ import { supabase } from "../../lib/supabase";
 import { toast } from "sonner";
 import type { Category } from "../../types";
 
+export function formatFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const val = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+  return `${val} ${sizes[i]}`;
+}
+
 interface ProductsAdminPanelProps {
   categories: Category[];
 }
@@ -46,6 +55,11 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
 
+  // Deferred File Upload State (Holds local File handles until final submit)
+  const [pendingAssetFile, setPendingAssetFile] = useState<File | null>(null);
+  const [pendingThumbnailFile, setPendingThumbnailFile] = useState<File | null>(null);
+  const [pendingGalleryFiles, setPendingGalleryFiles] = useState<{ file: File; previewUrl: string }[]>([]);
+
   // File Upload State
   const [attachedFile, setAttachedFile] = useState<{
     name: string;
@@ -53,7 +67,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
     format: string;
   } | null>(null);
 
-  // Gallery state
+  // Gallery URLs (mixture of existing Supabase public URLs and new local preview object URLs)
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
 
   const emptyForm = {
@@ -109,7 +123,6 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
         .from("products")
         .select(`
           *,
-          categories ( name, color ),
           product_images ( id, image_url, sort_order )
         `)
         .order("created_at", { ascending: false });
@@ -117,8 +130,8 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
       if (error) throw error;
       setProducts(data || []);
     } catch (err: any) {
-      console.error("Error loading products:", err);
-      toast.error("Failed to load products list.");
+      console.error("Load products error:", err);
+      toast.error("Failed to load products.");
     } finally {
       setLoading(false);
     }
@@ -140,12 +153,18 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
     setForm(emptyForm);
     setEditingId(null);
     setAttachedFile(null);
+    setPendingAssetFile(null);
+    setPendingThumbnailFile(null);
+    setPendingGalleryFiles([]);
     setGalleryUrls([]);
     setActiveFormTab("essentials");
   };
 
   const startEdit = (p: any) => {
     setEditingId(p.id);
+    setPendingAssetFile(null);
+    setPendingThumbnailFile(null);
+    setPendingGalleryFiles([]);
     setForm({
       title: p.title || "",
       slug: p.slug || "",
@@ -196,153 +215,57 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 1. Handle Direct Design Asset File Upload (.fig, .zip, .sketch, .xd)
-  const handleAssetFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 1. Handle Local Design Asset File Selection (.fig, .zip, .sketch, .xd, etc.)
+  const handleAssetFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    try {
-      setUploadProgress(`Uploading ${file.name}...`);
-      const ext = file.name.split(".").pop()?.toLowerCase() || "fig";
-      const sizeMB = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    const ext = file.name.split(".").pop()?.toLowerCase() || "fig";
+    const formattedSize = formatFileSize(file.size);
 
-      // Try uploading to Supabase Storage
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const filePath = `downloads/${fileName}`;
+    setPendingAssetFile(file);
+    setAttachedFile({
+      name: file.name,
+      size: formattedSize,
+      format: ext.toUpperCase(),
+    });
 
-      const { data, error } = await supabase.storage
-        .from("product-files")
-        .upload(filePath, file, { upsert: true });
+    setForm((prev) => ({
+      ...prev,
+      file_size: formattedSize,
+      formats: `Figma (.${ext})`,
+    }));
 
-      let publicDownloadUrl = "";
-
-      if (error) {
-        // If bucket is not public or missing, use local data url or direct URL
-        console.warn("Storage upload note:", error.message);
-        // Fallback: Read as Data URL
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          publicDownloadUrl = (ev.target?.result as string) || "";
-          setForm((prev) => ({
-            ...prev,
-            download_file_url: publicDownloadUrl,
-            file_size: sizeMB,
-            formats: `Figma (.${ext})`,
-          }));
-        };
-        reader.readAsDataURL(file);
-      } else {
-        const { data: urlData } = supabase.storage
-          .from("product-files")
-          .getPublicUrl(filePath);
-        publicDownloadUrl = urlData.publicUrl;
-        setForm((prev) => ({
-          ...prev,
-          download_file_url: publicDownloadUrl,
-          file_size: sizeMB,
-          formats: `Figma (.${ext})`,
-        }));
-      }
-
-      setAttachedFile({
-        name: file.name,
-        size: sizeMB,
-        format: ext.toUpperCase(),
-      });
-
-      toast.success(`Attached "${file.name}" (${sizeMB}) successfully!`);
-    } catch (err: any) {
-      console.error("Asset upload error:", err);
-      toast.error("Failed to upload file.");
-    } finally {
-      setUploadProgress(null);
-    }
+    toast.success(`Attached "${file.name}" (${formattedSize}) — will upload upon Save!`);
   };
 
-  // 2. Handle Thumbnail Image Upload
-  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 2. Handle Cover Image Thumbnail Selection (Local Preview)
+  const handleThumbnailSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    try {
-      setUploadProgress("Uploading cover image...");
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const filePath = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from("product-images")
-        .upload(filePath, file, { upsert: true });
-
-      if (error) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setForm((prev) => ({
-            ...prev,
-            thumbnail_url: ev.target?.result as string,
-          }));
-        };
-        reader.readAsDataURL(file);
-      } else {
-        const { data } = supabase.storage
-          .from("product-images")
-          .getPublicUrl(filePath);
-        setForm((prev) => ({ ...prev, thumbnail_url: data.publicUrl }));
-      }
-
-      toast.success("Cover thumbnail uploaded!");
-    } catch (err: any) {
-      console.error("Thumbnail upload error:", err);
-      toast.error("Failed to upload thumbnail.");
-    } finally {
-      setUploadProgress(null);
-    }
+    setPendingThumbnailFile(file);
+    const localUrl = URL.createObjectURL(file);
+    setForm((prev) => ({ ...prev, thumbnail_url: localUrl }));
+    toast.success("Cover image selected! (Will upload on Save)");
   };
 
-  // 3. Handle Multi-Image Gallery Upload
-  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 3. Handle Multi-Image Gallery Selection (Local Previews)
+  const handleGallerySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    try {
-      setUploadProgress(`Uploading ${files.length} preview images...`);
-      const newUrls: string[] = [];
+    const newPending = files.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
 
-      for (const file of files) {
-        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-        const filePath = `gallery/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-        const { error } = await supabase.storage
-          .from("product-images")
-          .upload(filePath, file, { upsert: true });
-
-        if (error) {
-          const reader = new FileReader();
-          await new Promise<void>((resolve) => {
-            reader.onload = (ev) => {
-              if (ev.target?.result) newUrls.push(ev.target.result as string);
-              resolve();
-            };
-            reader.readAsDataURL(file);
-          });
-        } else {
-          const { data } = supabase.storage
-            .from("product-images")
-            .getPublicUrl(filePath);
-          newUrls.push(data.publicUrl);
-        }
-      }
-
-      setGalleryUrls((prev) => [...prev, ...newUrls]);
-      toast.success(`Added ${newUrls.length} screenshots to gallery!`);
-    } catch (err: any) {
-      console.error("Gallery upload error:", err);
-      toast.error("Failed to upload gallery images.");
-    } finally {
-      setUploadProgress(null);
-    }
+    setPendingGalleryFiles((prev) => [...prev, ...newPending]);
+    setGalleryUrls((prev) => [...prev, ...newPending.map((p) => p.previewUrl)]);
+    toast.success(`Added ${files.length} screenshots to gallery! (Will upload on Save)`);
   };
 
-  // 4. Save / Update Product
+  // 4. Save / Update Product (Executes all Storage uploads and DB record sync upon Submit)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -353,13 +276,112 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
 
     try {
       setSaving(true);
+      setUploadProgress("Preparing upload...");
+
+      let finalThumbnailUrl = form.thumbnail_url;
+      let finalDownloadUrl = form.download_file_url;
+      let finalGalleryUrls: string[] = galleryUrls.filter(
+        (url) => !url.startsWith("blob:") && !url.startsWith("data:")
+      );
+
+      // A. Upload Cover Thumbnail if new file selected
+      if (pendingThumbnailFile) {
+        setUploadProgress("Uploading cover image to storage...");
+        const ext = pendingThumbnailFile.name.split(".").pop()?.toLowerCase() || "jpg";
+        const filePath = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+        const { error: thumbErr } = await supabase.storage
+          .from("product-images")
+          .upload(filePath, pendingThumbnailFile, { upsert: true });
+
+        if (thumbErr) {
+          console.warn("Storage upload note (Thumbnail):", thumbErr.message);
+          // Fallback: Read as base64 data url if bucket error
+          const reader = new FileReader();
+          await new Promise<void>((resolve) => {
+            reader.onload = (ev) => {
+              finalThumbnailUrl = (ev.target?.result as string) || finalThumbnailUrl;
+              resolve();
+            };
+            reader.readAsDataURL(pendingThumbnailFile);
+          });
+        } else {
+          const { data: thumbData } = supabase.storage
+            .from("product-images")
+            .getPublicUrl(filePath);
+          finalThumbnailUrl = thumbData.publicUrl;
+        }
+      }
+
+      // B. Upload Gallery Images if new files selected
+      if (pendingGalleryFiles.length > 0) {
+        for (let i = 0; i < pendingGalleryFiles.length; i++) {
+          setUploadProgress(`Uploading screenshot ${i + 1}/${pendingGalleryFiles.length}...`);
+          const item = pendingGalleryFiles[i];
+          const ext = item.file.name.split(".").pop()?.toLowerCase() || "jpg";
+          const filePath = `gallery/${Date.now()}-${i}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+          const { error: galErr } = await supabase.storage
+            .from("product-images")
+            .upload(filePath, item.file, { upsert: true });
+
+          if (!galErr) {
+            const { data: gData } = supabase.storage
+              .from("product-images")
+              .getPublicUrl(filePath);
+            finalGalleryUrls.push(gData.publicUrl);
+          } else {
+            console.warn("Storage upload note (Gallery):", galErr.message);
+            // Fallback base64
+            const reader = new FileReader();
+            await new Promise<void>((resolve) => {
+              reader.onload = (ev) => {
+                if (ev.target?.result) finalGalleryUrls.push(ev.target.result as string);
+                resolve();
+              };
+              reader.readAsDataURL(item.file);
+            });
+          }
+        }
+      }
+
+      // C. Upload Asset File (.fig / .zip) if new file selected
+      if (pendingAssetFile) {
+        setUploadProgress(`Uploading downloadable asset file (${pendingAssetFile.name})...`);
+        const ext = pendingAssetFile.name.split(".").pop()?.toLowerCase() || "fig";
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const filePath = `downloads/${fileName}`;
+
+        const { error: assetErr } = await supabase.storage
+          .from("product-files")
+          .upload(filePath, pendingAssetFile, { upsert: true });
+
+        if (assetErr) {
+          console.warn("Storage upload note (Asset file):", assetErr.message);
+          const reader = new FileReader();
+          await new Promise<void>((resolve) => {
+            reader.onload = (ev) => {
+              finalDownloadUrl = (ev.target?.result as string) || finalDownloadUrl;
+              resolve();
+            };
+            reader.readAsDataURL(pendingAssetFile);
+          });
+        } else {
+          const { data: assetData } = supabase.storage
+            .from("product-files")
+            .getPublicUrl(filePath);
+          finalDownloadUrl = assetData.publicUrl;
+        }
+      }
+
+      setUploadProgress("Saving product details to database...");
 
       const payload: any = {
         title: form.title.trim(),
         slug: form.slug.trim(),
         short_description: form.short_description.trim() || null,
         full_description: form.full_description.trim() || null,
-        thumbnail_url: form.thumbnail_url.trim() || null,
+        thumbnail_url: finalThumbnailUrl?.startsWith("blob:") ? null : (finalThumbnailUrl?.trim() || null),
         price: 0,
         is_free: true,
         category_id: form.category_id || null,
@@ -380,34 +402,63 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
         supports_auto_layout: form.supports_auto_layout,
         supports_light_dark: form.supports_light_dark,
         license_type: form.license_type,
-        download_file_url: form.download_file_url.trim() || null,
+        download_file_url: finalDownloadUrl?.startsWith("blob:") ? null : (finalDownloadUrl?.trim() || null),
         figma_preview_url: form.figma_preview_url.trim() || null,
       };
 
       let productId = editingId;
 
-      if (editingId) {
-        const { error } = await supabase
-          .from("products")
-          .update(payload)
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("products")
-          .insert(payload)
-          .select("id")
-          .single();
-        if (error) throw error;
-        productId = data.id;
+      try {
+        if (editingId) {
+          const { error } = await supabase
+            .from("products")
+            .update(payload)
+            .eq("id", editingId);
+          if (error) throw error;
+        } else {
+          const { data, error } = await supabase
+            .from("products")
+            .insert(payload)
+            .select("id")
+            .single();
+          if (error) throw error;
+          productId = data.id;
+        }
+      } catch (dbErr: any) {
+        // Schema cache mismatch resilience (e.g. PGRST204 on figma_preview_url or subcategory_id)
+        if (
+          dbErr.code === "PGRST204" ||
+          dbErr.message?.toLowerCase().includes("figma_preview_url") ||
+          dbErr.message?.toLowerCase().includes("schema cache")
+        ) {
+          console.warn("Retrying product save without figma_preview_url due to database cache mismatch:", dbErr.message);
+          delete payload.figma_preview_url;
+          if (editingId) {
+            const { error } = await supabase
+              .from("products")
+              .update(payload)
+              .eq("id", editingId);
+            if (error) throw error;
+          } else {
+            const { data, error } = await supabase
+              .from("products")
+              .insert(payload)
+              .select("id")
+              .single();
+            if (error) throw error;
+            productId = data.id;
+          }
+        } else {
+          throw dbErr;
+        }
       }
 
       // Sync gallery images in product_images
       if (productId) {
         await supabase.from("product_images").delete().eq("product_id", productId);
-        if (galleryUrls.length > 0) {
+        if (finalGalleryUrls.length > 0) {
           await supabase.from("product_images").insert(
-            galleryUrls.map((url, idx) => ({
+            finalGalleryUrls.map((url, idx) => ({
               product_id: productId,
               image_url: url,
               sort_order: idx,
@@ -426,6 +477,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
       toast.error(err.message || "Failed to save product.");
     } finally {
       setSaving(false);
+      setUploadProgress(null);
     }
   };
 
@@ -659,8 +711,8 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".fig,.zip,.sketch,.xd,.pdf"
-                    onChange={handleAssetFileUpload}
+                    accept=".fig,.zip,.sketch,.xd,.svg,.pdf,.rar,.7z,.tar,.gz"
+                    onChange={handleAssetFileSelect}
                     className="hidden"
                   />
 
@@ -675,7 +727,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                       Click or drag & drop design file here
                     </p>
                     <p className="text-xs text-muted-foreground font-mono">
-                      Supports .FIG, .ZIP, .SKETCH, .XD (Max 250 MB)
+                      Supports .FIG, .ZIP, .SKETCH, .XD, .SVG, .PDF, .RAR, .7Z (Auto calculates size)
                     </p>
                   </div>
                 </div>
@@ -692,7 +744,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                           {attachedFile.name}
                         </p>
                         <p className="text-[11px] text-muted-foreground font-mono">
-                          Size: <span className="text-primary font-bold">{form.file_size}</span> · Format: {attachedFile.format}
+                          Size: <span className="text-primary font-bold">{form.file_size}</span> · Format: {attachedFile.format} · <span className="text-emerald-500 font-bold">Staged for Save</span>
                         </p>
                       </div>
                     </div>
@@ -701,6 +753,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                       type="button"
                       onClick={() => {
                         setAttachedFile(null);
+                        setPendingAssetFile(null);
                         setForm((prev) => ({ ...prev, download_file_url: "" }));
                       }}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
@@ -728,14 +781,14 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-bold">
-                      Display File Size
+                      Calculated File Size (Auto-Populated)
                     </label>
                     <input
                       value={form.file_size}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, file_size: e.target.value }))
                       }
-                      placeholder="e.g. 48.5 MB"
+                      placeholder="e.g. 48.5 MB or 650 KB"
                       className={inputCls}
                     />
                   </div>
@@ -770,7 +823,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                     ref={thumbnailInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={handleThumbnailUpload}
+                    onChange={handleThumbnailSelect}
                     className="hidden"
                   />
 
@@ -783,9 +836,9 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                         size={24}
                         className="mx-auto mb-2 text-muted-foreground group-hover:text-primary transition-colors"
                       />
-                      <p className="text-xs font-bold text-foreground">Upload Cover Image</p>
+                      <p className="text-xs font-bold text-foreground">Select Cover Image</p>
                       <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
-                        PNG, JPG, WebP (16:10 or 16:9)
+                        PNG, JPG, WebP (Uploaded on Submit)
                       </p>
                     </div>
 
@@ -798,9 +851,10 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                         />
                         <button
                           type="button"
-                          onClick={() =>
-                            setForm((prev) => ({ ...prev, thumbnail_url: "" }))
-                          }
+                          onClick={() => {
+                            setPendingThumbnailFile(null);
+                            setForm((prev) => ({ ...prev, thumbnail_url: "" }));
+                          }}
                           className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-destructive transition-colors cursor-pointer"
                         >
                           <X size={12} />
@@ -843,7 +897,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                     type="file"
                     accept="image/*"
                     multiple
-                    onChange={handleGalleryUpload}
+                    onChange={handleGallerySelect}
                     className="hidden"
                   />
 

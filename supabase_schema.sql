@@ -3,6 +3,14 @@
 -- Run this in Supabase SQL Editor (Dashboard -> SQL Editor -> New Query)
 -- ==============================================================================
 
+-- 0. Safe Schema Upgrades (Run these to upgrade existing instances without data loss)
+ALTER TABLE IF EXISTS public.products ADD COLUMN IF NOT EXISTS figma_preview_url TEXT;
+ALTER TABLE IF EXISTS public.products ADD COLUMN IF NOT EXISTS subcategory_id UUID;
+ALTER TABLE IF EXISTS public.products ADD COLUMN IF NOT EXISTS download_file_url TEXT;
+ALTER TABLE IF EXISTS public.products ADD COLUMN IF NOT EXISTS file_size TEXT DEFAULT '45 MB';
+ALTER TABLE IF EXISTS public.products ADD COLUMN IF NOT EXISTS formats TEXT[] DEFAULT ARRAY['Figma'];
+NOTIFY pgrst, 'reload schema';
+
 -- 1. Enable required UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

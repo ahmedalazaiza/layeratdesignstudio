@@ -340,7 +340,7 @@ export function App() {
     const restoreSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const { data: profile } = await supabase
+        let { data: profile } = await supabase
           .from("profiles")
           .select("role, full_name, avatar_url, bio, website")
           .eq("id", session.user.id)
@@ -354,6 +354,30 @@ export function App() {
           session.user.confirmed_at ||
           isAdmin
         );
+
+        if (!profile) {
+          const defaultName =
+            session.user.user_metadata?.full_name ||
+            session.user.email?.split("@")[0] ||
+            "User";
+          await supabase
+            .from("profiles")
+            .upsert(
+              {
+                id: session.user.id,
+                email: session.user.email,
+                full_name: defaultName,
+                avatar_url:
+                  session.user.user_metadata?.avatar_url ||
+                  session.user.user_metadata?.picture ||
+                  null,
+                role: isAdmin ? "admin" : "user",
+                provider: session.user.app_metadata?.provider || "email",
+              },
+              { onConflict: "id" }
+            )
+            .catch(() => {});
+        }
 
         setAuthUser({
           id: session.user.id,
@@ -395,7 +419,7 @@ export function App() {
         if (event === "PASSWORD_RECOVERY") {
           setShowSetNewPasswordModal(true);
         } else if (event === "SIGNED_IN" && session?.user) {
-          const { data: profile } = await supabase
+          let { data: profile } = await supabase
             .from("profiles")
             .select("role, full_name, avatar_url, bio, website")
             .eq("id", session.user.id)
@@ -410,6 +434,30 @@ export function App() {
             session.user.confirmed_at ||
             isAdmin
           );
+
+          if (!profile) {
+            const defaultName =
+              session.user.user_metadata?.full_name ||
+              session.user.email?.split("@")[0] ||
+              "User";
+            await supabase
+              .from("profiles")
+              .upsert(
+                {
+                  id: session.user.id,
+                  email: session.user.email,
+                  full_name: defaultName,
+                  avatar_url:
+                    session.user.user_metadata?.avatar_url ||
+                    session.user.user_metadata?.picture ||
+                    null,
+                  role: isAdmin ? "admin" : "user",
+                  provider: session.user.app_metadata?.provider || "email",
+                },
+                { onConflict: "id" }
+              )
+              .catch(() => {});
+          }
 
           setAuthUser({
             id: session.user.id,

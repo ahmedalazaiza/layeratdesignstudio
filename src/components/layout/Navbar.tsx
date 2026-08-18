@@ -20,6 +20,7 @@ import {
 import { UnverifiedEmailBanner } from "./UnverifiedEmailBanner";
 import { LayeratLogo } from "../brand/LayeratLogo";
 import { CategoryMegaMenu } from "./CategoryMegaMenu";
+import { NotificationCenter } from "./NotificationCenter";
 import type { Page, AuthUser, Category } from "../../types";
 
 export type ThemeMode = "light" | "dark" | "system";
@@ -340,6 +341,9 @@ export function Navbar({
               </span>
             )}
           </button>
+
+          {/* Notification Center */}
+          <NotificationCenter onNavigate={onNavigate} isDark={isDark} />
 
           {/* Auth / User Profile */}
           {authUser ? (
