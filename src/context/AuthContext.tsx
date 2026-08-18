@@ -75,6 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? "creator"
           : "user";
 
+      const isVerified = Boolean(
+        sessionUser.email_confirmed_at ||
+        sessionUser.confirmed_at ||
+        sessionUser.app_metadata?.provider === "google" ||
+        profile?.is_verified ||
+        profile?.email_verified ||
+        isConfiguredAdmin
+      );
+
       const user: AuthUser = {
         id: sessionUser.id,
         email,
@@ -83,7 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userRole,
         provider: sessionUser.app_metadata?.provider || "email",
         createdAt: profile?.created_at || sessionUser.created_at,
-        isEmailVerified: sessionUser.email_confirmed_at != null || sessionUser.app_metadata?.provider === "google",
+        isVerified,
+        isEmailVerified: isVerified,
       };
 
       setAuthUser(user);
