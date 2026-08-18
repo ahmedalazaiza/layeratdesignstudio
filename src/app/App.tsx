@@ -1,3 +1,12 @@
+import type {
+  Page,
+  Category,
+  Subcategory,
+  Product,
+  AuthUser,
+  BrowseFilters,
+} from "../types";
+
 import { GiftPopup } from "../components/auth/GiftPopup";
 import { AuthModal } from "../components/auth/AuthModal";
 import { AdminPage } from "../components/admin/AdminPage";
@@ -138,92 +147,9 @@ export const API_BASE: string =
  * ====================================================================
  */
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 
-type Page =
-  | "home"
-  | "browse"
-  | "product"
-  | "profile"
-  | "publisher"
-  | "team"
-  | "about"
-  | "favorites"
-  | "admin";
 
-interface Subcategory {
-  id: string;
-  name: string;
-  slug: string;
-}
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  icon: React.ElementType;
-  color: string;
-  subcategories: Subcategory[];
-}
-
-interface Product {
-  id: string;
-  title: string;
-  slug: string;
-  shortDescription: string;
-  fullDescription: string;
-  price: number; // USD; 0 when isFree
-  discountPrice?: number; // active sale price
-  currency: string; // "USD"
-  isFree: boolean;
-  thumbnail: string; // cover image URL
-  galleryImages: string[]; // 6+ preview images for detail page
-  figmaPreviewUrl?: string; // Figma Community or embed URL
-  categoryId: string;
-  subcategoryId: string;
-  tags: string[];
-  // File specs
-  fileSize: string; // e.g. "18.4 MB"
-  formats: string[]; // ["Figma"] or ["Figma", "Sketch"]
-  screensCount: number;
-  componentsCount: number;
-  version: string; // e.g. "v2.0.0"
-  // Figma feature flags (show as badges in detail)
-  supportsVariables: boolean;
-  supportsAutoLayout: boolean;
-  supportsLightDark: boolean;
-  // License
-  licenseType: "personal" | "commercial";
-  // Stats – read from /products/:id/stats or embed in product response
-  downloadsCount: number;
-  viewsCount: number;
-  rating: number; // 0–5 float
-  reviewsCount: number;
-  // Secure download URL – backend returns a signed, time-limited link
-  downloadFileUrl: string;
-}
-
-// Mirrors the backend User model; extend fields as needed
-interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string; // URL; null → show initials fallback
-  bio?: string;
-  website?: string;
-  role: "user" | "creator" | "admin";
-  purchases: string[]; // product IDs
-  wishlist: string[]; // product IDs
-  createdAt: string; // ISO 8601
-}
-
-interface BrowseFilters {
-  query: string;
-  categoryId: string | null;
-  subcategoryId: string | null;
-  isFree: boolean | null; // null = show all
-  sortBy: "newest" | "downloads" | "rating" | "price-asc" | "price-desc";
-}
 
 // ─── Static Data ─────────────────────────────────────────────────────────────
 // TODO: Replace with GET ${API_BASE}/categories
