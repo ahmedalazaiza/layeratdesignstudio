@@ -23,6 +23,7 @@ export function ProductLightbox({
 }: ProductLightboxProps) {
   const [current, setCurrent] = useState(startIndex);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -52,6 +53,23 @@ export function ProductLightbox({
   const next = () => {
     setIsZoomed(false);
     setCurrent((c) => (c + 1) % images.length);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+    // Swipe threshold 50px
+    if (diff > 50 && images.length > 1) {
+      next();
+    } else if (diff < -50 && images.length > 1) {
+      prev();
+    }
+    setTouchStart(null);
   };
 
   return (
@@ -97,18 +115,20 @@ export function ProductLightbox({
         </div>
       </div>
 
-      {/* Main Image Area */}
+      {/* Main Image Area with Touch Swipe */}
       <div
-        className="flex-1 flex items-center justify-center relative overflow-hidden px-4 sm:px-16 py-6"
+        className="flex-1 flex items-center justify-center relative overflow-hidden px-2 sm:px-16 py-4 sm:py-6"
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {images.length > 1 && (
           <button
             onClick={prev}
             aria-label="Previous image"
-            className="absolute left-4 sm:left-6 w-12 h-12 rounded-full border border-white/15 bg-black/40 backdrop-blur-md hover:bg-white/20 flex items-center justify-center transition-all duration-200 z-20 cursor-pointer text-white shadow-xl"
+            className="absolute left-2 sm:left-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-white/15 bg-black/50 backdrop-blur-md hover:bg-white/20 flex items-center justify-center transition-all duration-200 z-20 cursor-pointer text-white shadow-xl"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={20} className="sm:w-6 sm:h-6" />
           </button>
         )}
 
@@ -137,9 +157,9 @@ export function ProductLightbox({
           <button
             onClick={next}
             aria-label="Next image"
-            className="absolute right-4 sm:right-6 w-12 h-12 rounded-full border border-white/15 bg-black/40 backdrop-blur-md hover:bg-white/20 flex items-center justify-center transition-all duration-200 z-20 cursor-pointer text-white shadow-xl"
+            className="absolute right-2 sm:right-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-white/15 bg-black/50 backdrop-blur-md hover:bg-white/20 flex items-center justify-center transition-all duration-200 z-20 cursor-pointer text-white shadow-xl"
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={20} className="sm:w-6 sm:h-6" />
           </button>
         )}
       </div>

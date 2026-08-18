@@ -314,9 +314,9 @@ export function TeamPage({ onNavigate, categories }: TeamPageProps) {
           </p>
           <button
             onClick={() => onNavigate("publisher")}
-            className="group inline-flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300 cursor-pointer"
+            className="group w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-primary text-black font-extrabold text-sm sm:text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
           >
-            Publish With Us
+            <span>Publish With Us</span>
             <ArrowUpRight
               size={18}
               className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"

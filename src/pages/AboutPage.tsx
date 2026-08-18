@@ -406,12 +406,12 @@ export function AboutPage({ onNavigate, categories }: AboutPageProps) {
             Browse 500+ free Figma resources — or join as a creator and share
             your work with the world.
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center max-w-md mx-auto sm:max-w-none">
             <button
               onClick={() => onNavigate("browse")}
-              className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.3)] transition-all duration-300 cursor-pointer"
+              className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-primary text-black font-extrabold text-sm sm:text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
             >
-              Browse Free Resources
+              <span>Browse Free Resources</span>
               <ArrowUpRight
                 size={18}
                 className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
@@ -419,7 +419,7 @@ export function AboutPage({ onNavigate, categories }: AboutPageProps) {
             </button>
             <button
               onClick={() => onNavigate("publisher")}
-              className="flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 cursor-pointer"
+              className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-sm sm:text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 cursor-pointer"
             >
               Become a Publisher
             </button>

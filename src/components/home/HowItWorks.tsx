@@ -76,18 +76,18 @@ export function HowItWorks() {
   ];
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 bg-muted/30">
-      <div className="max-w-7xl mx-auto px-6 lg:px-10">
+    <section ref={ref} className="py-16 sm:py-24 lg:py-32 bg-muted/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="text-center mb-10 sm:mb-16"
         >
-          <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+          <span className="text-primary font-mono text-xs sm:text-sm font-medium tracking-widest uppercase">
             How It Works
           </span>
-          <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
+          <h2 className="mt-2 sm:mt-4 text-2xl sm:text-4xl lg:text-5xl font-display font-extrabold text-foreground break-words">
             From browse to done in minutes
           </h2>
         </motion.div>

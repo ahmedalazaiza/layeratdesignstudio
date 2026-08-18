@@ -9,6 +9,8 @@ export function ProductCard({
   onWishlistToggle,
   onAuthOpen,
   categories,
+  wishlist,
+  isWishlisted,
 }: {
   product: Product;
   onProductClick: (p: Product) => void;
@@ -16,10 +18,17 @@ export function ProductCard({
   onWishlistToggle: (productId: string) => void;
   onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   categories: Category[];
+  wishlist?: string[];
+  isWishlisted?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
 
-  const isInWishlist = authUser?.wishlist.includes(product.id) ?? false;
+  const isInWishlist =
+    isWishlisted !== undefined
+      ? isWishlisted
+      : wishlist !== undefined
+      ? wishlist.includes(product.id)
+      : Boolean(authUser?.wishlist?.includes(product.id));
 
   const handleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -60,13 +69,16 @@ export function ProductCard({
         <button
           onClick={handleWishlist}
           aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-200 cursor-pointer ${
+          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-200 cursor-pointer shadow-md z-10 ${
             isInWishlist
-              ? "bg-primary text-primary-foreground"
-              : "bg-background/70 text-foreground/80 hover:text-foreground hover:bg-background/90"
+              ? "bg-rose-500 text-white scale-110 shadow-rose-500/40 ring-2 ring-white/30"
+              : "bg-black/50 text-white/90 hover:text-white hover:bg-black/70 hover:scale-105"
           }`}
         >
-          <Heart size={14} className={isInWishlist ? "fill-current" : ""} />
+          <Heart
+            size={14}
+            className={isInWishlist ? "fill-current text-white" : "text-white/90"}
+          />
         </button>
 
         {/* Glow overlay */}

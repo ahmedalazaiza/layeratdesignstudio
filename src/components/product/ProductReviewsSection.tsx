@@ -402,35 +402,37 @@ export function ProductReviewsSection({
               <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2 font-semibold">
                 Your Overall Rating
               </label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    onMouseEnter={() => setHoverRating(star)}
-                    onMouseLeave={() => setHoverRating(null)}
-                    className="p-1 text-muted-foreground hover:scale-125 transition-transform cursor-pointer"
-                  >
-                    <Star
-                      size={24}
-                      className={
-                        star <= (hoverRating ?? rating)
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-muted-foreground/30"
-                      }
-                    />
-                  </button>
-                ))}
-                <span className="ml-3 text-xs font-mono font-bold text-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(null)}
+                      className="p-1.5 text-muted-foreground hover:scale-125 transition-transform cursor-pointer touch-manipulation"
+                    >
+                      <Star
+                        size={22}
+                        className={
+                          star <= (hoverRating ?? rating)
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-muted-foreground/30"
+                        }
+                      />
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[11px] sm:text-xs font-mono font-bold text-foreground bg-secondary/80 px-2.5 py-1 rounded-full border border-border">
                   {rating === 5
                     ? "⭐⭐⭐⭐⭐ Exceptional"
                     : rating === 4
                     ? "⭐⭐⭐⭐ Very Good"
                     : rating === 3
-                    ? "⭐⭐⭐ Good / Useful"
+                    ? "⭐⭐⭐ Good"
                     : rating === 2
-                    ? "⭐⭐ Needs Improvement"
+                    ? "⭐⭐ Needs Work"
                     : "⭐ Poor"}
                 </span>
               </div>
@@ -447,24 +449,26 @@ export function ProductReviewsSection({
                 required
                 rows={3}
                 placeholder="What did you like about the components, typography, variables, or layouts in this kit?"
-                className="w-full px-4 py-3 rounded-2xl border border-border bg-background text-foreground text-xs focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                className="w-full px-4 py-3 rounded-2xl border border-border bg-background text-foreground text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all resize-none"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting || !reviewText.trim()}
-              className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-xs hover:shadow-[0_0_20px_rgba(170,255,56,0.25)] transition-all cursor-pointer disabled:opacity-50"
-            >
-              {submitting ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Star size={13} className="fill-current" />
-                  <span>{isEditing ? "Update Review" : "Publish Verified Review"}</span>
-                </>
-              )}
-            </button>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={submitting || !reviewText.trim()}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-primary text-black font-extrabold text-xs sm:text-sm hover:shadow-[0_0_20px_rgba(170,255,56,0.3)] transition-all cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Star size={14} className="fill-current" />
+                    <span>{isEditing ? "Update Review" : "Publish Verified Review"}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         )}
       </div>

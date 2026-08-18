@@ -31,6 +31,7 @@ export function HomePage({
   onProductClick,
   onWishlistToggle,
   onAuthOpen,
+  wishlist,
 }: HomePageProps) {
   return (
     <motion.main
@@ -45,7 +46,7 @@ export function HomePage({
         onNavigate={onNavigate}
         onAuthOpen={onAuthOpen}
       />
-      <StatsSection />
+      <StatsSection products={products} />
       <CategoriesSection
         onCategoryClick={onCategoryClick}
         categories={categories}
@@ -58,6 +59,7 @@ export function HomePage({
         onWishlistToggle={onWishlistToggle}
         onAuthOpen={onAuthOpen}
         categories={categories}
+        wishlist={wishlist}
       />
       <HowItWorks />
       <Footer onNavigate={onNavigate} categories={categories} />

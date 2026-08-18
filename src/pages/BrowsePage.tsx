@@ -32,6 +32,7 @@ export function BrowsePage({
   categories,
   products,
   onNavigate,
+  wishlist,
   activeCategoryId,
   onCategoryChange,
   initialSearchQuery,
@@ -160,29 +161,78 @@ export function BrowsePage({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Mobile filter toggle */}
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
-            >
-              <Filter size={15} /> Filters
-            </button>
-
-            {/* Custom Sort Select */}
-            <div className="w-48 ml-auto">
-              <CustomSelect
-                options={sortOptions}
-                value={filters.sortBy}
-                onChange={(val) =>
-                  setFilters((f) => ({
-                    ...f,
-                    sortBy: val as BrowseFilters["sortBy"],
-                  }))
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+            {/* Mobile quick search */}
+            <div className="relative lg:hidden w-full">
+              <Search
+                size={16}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                value={filters.query}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, query: e.target.value }))
                 }
+                placeholder="Search free resources..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
               />
             </div>
+
+            <div className="flex items-center gap-3 justify-between sm:justify-end">
+              {/* Mobile filter toggle */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm font-medium text-foreground hover:border-primary/40 transition-colors cursor-pointer"
+              >
+                <Filter size={15} /> <span>Filters</span>
+              </button>
+
+              {/* Custom Sort Select */}
+              <div className="w-44 sm:w-48">
+                <CustomSelect
+                  options={sortOptions}
+                  value={filters.sortBy}
+                  onChange={(val) =>
+                    setFilters((f) => ({
+                      ...f,
+                      sortBy: val as BrowseFilters["sortBy"],
+                    }))
+                  }
+                />
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Mobile Horizontal Quick-Category Chips (Touch-friendly scroll) */}
+        <div className="lg:hidden flex overflow-x-auto no-scrollbar gap-2 mb-6 pb-2 -mx-4 px-4">
+          <button
+            onClick={() => handleSelectCategory(null)}
+            className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap ${
+              filters.categoryId === null
+                ? "bg-primary text-black shadow-sm"
+                : "border border-border bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Resources ({products.length})
+          </button>
+          {categories.map((cat) => {
+            const isSelected = filters.categoryId === cat.id;
+            const count = products.filter((p) => p.categoryId === cat.id).length;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => handleSelectCategory(cat.id)}
+                className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap ${
+                  isSelected
+                    ? "bg-primary text-black shadow-sm"
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {cat.name} ({count})
+              </button>
+            );
+          })}
         </div>
 
         {/* Main layout */}
@@ -441,6 +491,12 @@ export function BrowsePage({
                     onWishlistToggle={handleWishlist}
                     onAuthOpen={onAuthOpen}
                     categories={categories}
+                    wishlist={wishlist}
+                    isWishlisted={
+                      wishlist
+                        ? wishlist.includes(prod.id)
+                        : Boolean(authUser?.wishlist?.includes(prod.id))
+                    }
                   />
                 ))}
               </div>

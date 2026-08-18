@@ -47,7 +47,7 @@ export function AuthModal({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const inputClass =
-    "w-full px-4 py-3.5 pr-12 rounded-2xl border border-border bg-background/80 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+    "w-full px-4 py-3.5 pr-12 rounded-2xl border border-border bg-background/80 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-base sm:text-sm";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -199,7 +199,7 @@ export function AuthModal({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.96 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-md bg-card border border-border rounded-3xl p-7 sm:p-8 shadow-2xl overflow-hidden"
+          className="relative w-full max-w-md bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh] my-auto"
         >
           {/* Close button */}
           <button
@@ -242,7 +242,7 @@ export function AuthModal({
                   setErrorMsg("");
                   onSwitchMode("login");
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.25)] transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
               >
                 Back to sign in
               </button>
@@ -274,7 +274,7 @@ export function AuthModal({
                   setStatus("idle");
                   onSwitchMode("login");
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.25)] transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
               >
                 Continue to sign in
               </button>
@@ -464,10 +464,10 @@ export function AuthModal({
                 <button
                   type="submit"
                   disabled={status === "loading"}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_35px_rgba(170,255,56,0.3)] transition-all duration-300 cursor-pointer disabled:opacity-60 mt-2"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_35px_rgba(170,255,56,0.4)] transition-all duration-300 cursor-pointer disabled:opacity-60 mt-2 shadow-md shadow-primary/20"
                 >
                   {status === "loading" ? (
-                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                   ) : (
                     <>
                       <span>

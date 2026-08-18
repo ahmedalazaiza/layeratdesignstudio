@@ -171,7 +171,7 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
   };
 
   const inputCls =
-    "w-full px-4 py-3 rounded-2xl border border-border bg-background/80 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+    "w-full px-4 py-3 rounded-2xl border border-border bg-background/80 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-base sm:text-sm";
 
   return (
     <AnimatePresence>
@@ -182,7 +182,7 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[300] flex items-center justify-center p-4 overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) handleDismiss();
           }}
@@ -194,9 +194,9 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 28, scale: 0.97 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-2xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col sm:flex-row"
+            className="relative w-full max-w-2xl bg-card border border-border rounded-3xl overflow-y-auto max-h-[92vh] shadow-2xl flex flex-col sm:flex-row my-auto"
           >
-            {/* ── LEFT: Image panel ──────────────────────────────────────── */}
+            {/* ── LEFT: Image panel (Desktop / Tablet) ──────────────────────────────────────── */}
             <div className="relative sm:w-[42%] min-h-[220px] sm:min-h-[500px] overflow-hidden hidden sm:block">
               <img
                 src={giftConfig.image_url}
@@ -222,24 +222,39 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
             </div>
 
             {/* ── RIGHT: Form panel ──────────────────────────────────────── */}
-            <div className="flex-1 flex flex-col px-7 py-8 relative">
+            <div className="flex-1 flex flex-col px-6 sm:px-7 py-6 sm:py-8 relative">
               {/* Dismiss */}
               <button
                 onClick={handleDismiss}
                 aria-label="Close"
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-all duration-200 cursor-pointer"
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-all duration-200 cursor-pointer z-10"
               >
                 <X size={14} />
               </button>
 
               {step === "form" ? (
                 <>
+                  {/* Mobile Compact Gift Badge */}
+                  <div className="sm:hidden flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-2xl mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary shrink-0">
+                      <Gift size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-mono font-bold text-primary uppercase block">
+                        🎁 Free Exclusive Starter Kit
+                      </span>
+                      <span className="text-xs font-bold text-foreground truncate block">
+                        {giftConfig.title}
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Header */}
-                  <div className="mb-5">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono font-bold uppercase tracking-wider mb-2">
+                  <div className="mb-4 sm:mb-5">
+                    <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono font-bold uppercase tracking-wider mb-2">
                       <Sparkles size={11} /> 100% Free Gift
                     </div>
-                    <h2 className="text-2xl font-display font-extrabold text-foreground leading-snug">
+                    <h2 className="text-xl sm:text-2xl font-display font-extrabold text-foreground leading-snug">
                       {giftConfig.title}
                     </h2>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -299,10 +314,10 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
                       <button
                         type="submit"
                         disabled={loading || !email.trim()}
-                        className="w-full py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                        className="w-full py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.4)] transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer shadow-md shadow-primary/20"
                       >
                         {loading ? (
-                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                          <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                         ) : (
                           <>
                             <Gift size={16} />
@@ -346,7 +361,7 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
                   <button
                     type="button"
                     onClick={handleDismiss}
-                    className="w-full py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-xs hover:shadow-[0_0_20px_rgba(170,255,56,0.25)] transition-all cursor-pointer"
+                    className="w-full py-3.5 rounded-2xl bg-primary text-black font-extrabold text-xs sm:text-sm hover:shadow-[0_0_20px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
                   >
                     Got it, I'll check my inbox
                   </button>

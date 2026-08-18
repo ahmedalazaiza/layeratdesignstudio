@@ -48,6 +48,10 @@ export const DEFAULT_HOME_CONTENT = {
   ],
   heroPreviewImage:
     "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=640&h=640&fit=crop&auto=format",
+  statsResources: 500,
+  statsDownloads: 50,
+  statsDesigners: 12,
+  statsSatisfaction: 99,
 };
 
 export const DEFAULT_FOOTER_CONTENT = {
@@ -879,6 +883,86 @@ export function SiteContentAdminPanel() {
                 }
                 className={inputClass}
               />
+            </div>
+
+            {/* Homepage Statistics Counters */}
+            <div className="pt-4 border-t border-border/60">
+              <label className="text-xs font-mono text-primary block mb-3 font-bold uppercase tracking-wider">
+                📊 Homepage Statistics Counters (Social Proof)
+              </label>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Free Resources Count
+                  </label>
+                  <input
+                    type="number"
+                    value={homeData.statsResources ?? 500}
+                    onChange={(e) =>
+                      setHomeData({
+                        ...homeData,
+                        statsResources: Number(e.target.value) || 0,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-0.5 block">Displays as: {homeData.statsResources ?? 500}+</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Downloads (in K)
+                  </label>
+                  <input
+                    type="number"
+                    value={homeData.statsDownloads ?? 50}
+                    onChange={(e) =>
+                      setHomeData({
+                        ...homeData,
+                        statsDownloads: Number(e.target.value) || 0,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-0.5 block">Displays as: {homeData.statsDownloads ?? 50}K+</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Active Designers (in K)
+                  </label>
+                  <input
+                    type="number"
+                    value={homeData.statsDesigners ?? 12}
+                    onChange={(e) =>
+                      setHomeData({
+                        ...homeData,
+                        statsDesigners: Number(e.target.value) || 0,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-0.5 block">Displays as: {homeData.statsDesigners ?? 12}K+</span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Satisfaction Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={homeData.statsSatisfaction ?? 99}
+                    onChange={(e) =>
+                      setHomeData({
+                        ...homeData,
+                        statsSatisfaction: Number(e.target.value) || 0,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-0.5 block">Displays as: {homeData.statsSatisfaction ?? 99}%</span>
+                </div>
+              </div>
             </div>
           </div>
 

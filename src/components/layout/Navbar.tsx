@@ -31,10 +31,17 @@ function useScrollY(enabled: boolean = true) {
     }
 
     let ticking = false;
+    const getScroll = () =>
+      window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+
     const onScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          setScrollY(window.scrollY);
+          setScrollY(getScroll());
           ticking = false;
         });
         ticking = true;
@@ -91,7 +98,7 @@ export function Navbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchVal, setSearchVal] = useState("");
   const profileRef = useRef<HTMLDivElement>(null);
-  const solid = scrollY > 40 || menuOpen || searchOpen;
+  const isSolid = scrollY > 5 || page !== "home" || menuOpen || searchOpen;
 
   const isAdmin =
     authUser &&
@@ -146,6 +153,9 @@ export function Navbar({
         .toUpperCase()
     : "";
 
+  const isHomeActive = page === "home";
+  const isAllResourcesActive = page === "browse" && !activeCategoryId;
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 pointer-events-auto">
       {/* Unverified Email Top Banner (Stacks above Navbar, never overlaps) */}
@@ -156,9 +166,9 @@ export function Navbar({
 
       <nav
         className={`w-full transition-all duration-300 border-b ${
-          solid
-            ? "bg-background/90 backdrop-blur-xl border-border shadow-sm"
-            : "bg-transparent border-transparent"
+          isSolid
+            ? "bg-card/98 dark:bg-[#080c09]/98 backdrop-blur-2xl border-border/80 shadow-md shadow-black/5 dark:shadow-black/30"
+            : "bg-background/90 dark:bg-[#080c09]/90 backdrop-blur-xl border-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 lg:px-10 flex items-center justify-between h-16 lg:h-20 gap-4">
@@ -179,15 +189,15 @@ export function Navbar({
           <button
             onClick={() => onNavigate("home")}
             className={`text-sm transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
-              page === "home"
-                ? "text-primary font-bold bg-primary/5"
+              isHomeActive
+                ? "text-primary font-bold bg-primary/10"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Home
             <span
               className={`absolute -bottom-0.5 left-3 right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                page === "home"
+                isHomeActive
                   ? "scale-x-100"
                   : "scale-x-0 group-hover:scale-x-100"
               }`}
@@ -197,15 +207,15 @@ export function Navbar({
           <button
             onClick={() => onNavigate("browse")}
             className={`text-sm transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
-              page === "browse" && !activeCategoryId
-                ? "text-primary font-bold bg-primary/5"
+              isAllResourcesActive
+                ? "text-primary font-bold bg-primary/10"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             All Free Resources
             <span
               className={`absolute -bottom-0.5 left-3 right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                page === "browse" && !activeCategoryId
+                isAllResourcesActive
                   ? "scale-x-100"
                   : "scale-x-0 group-hover:scale-x-100"
               }`}
@@ -213,14 +223,14 @@ export function Navbar({
           </button>
 
           {categories.map((cat) => {
-            const isActive = activeCategoryId === cat.id;
+            const isActive = page === "browse" && activeCategoryId === cat.id;
             return (
               <button
                 key={cat.id}
                 onClick={() => onCategoryClick(cat.id)}
                 className={`text-sm transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
                   isActive
-                    ? "text-primary font-bold bg-primary/5"
+                    ? "text-primary font-bold bg-primary/10"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -634,12 +644,46 @@ export function Navbar({
                   onCategoryClick(cat.id);
                   setMenuOpen(false);
                 }}
-                className="flex items-center gap-3 w-full text-left py-3 text-base text-muted-foreground hover:text-foreground border-b border-border/30 last:border-0 transition-colors"
+                className="flex items-center gap-3 w-full text-left py-2.5 text-sm text-muted-foreground hover:text-foreground border-b border-border/20 transition-colors"
               >
-                <cat.icon size={16} style={{ color: cat.color }} />
-                {cat.name}
+                <cat.icon size={15} style={{ color: cat.color }} />
+                <span>{cat.name}</span>
               </button>
             ))}
+
+            {/* Quick Page Links for Mobile */}
+            <div className="py-2 border-b border-border/30 space-y-1">
+              <button
+                onClick={() => {
+                  onNavigate("publisher");
+                  setMenuOpen(false);
+                }}
+                className="flex items-center justify-between w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>Become a Publisher</span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  Creators
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  onNavigate("about");
+                  setMenuOpen(false);
+                }}
+                className="flex items-center justify-between w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>About Layerat</span>
+              </button>
+              <button
+                onClick={() => {
+                  onNavigate("team");
+                  setMenuOpen(false);
+                }}
+                className="flex items-center justify-between w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>Our Team</span>
+              </button>
+            </div>
 
             {/* Mobile Theme Selector */}
             <div className="py-3 border-b border-border/30">
@@ -653,9 +697,9 @@ export function Navbar({
                 <button
                   type="button"
                   onClick={() => onThemeChange?.("light")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     themeMode === "light"
-                      ? "bg-primary text-primary-foreground font-bold"
+                      ? "bg-primary text-black font-extrabold shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -664,9 +708,9 @@ export function Navbar({
                 <button
                   type="button"
                   onClick={() => onThemeChange?.("dark")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     themeMode === "dark"
-                      ? "bg-primary text-primary-foreground font-bold"
+                      ? "bg-primary text-black font-extrabold shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -675,9 +719,9 @@ export function Navbar({
                 <button
                   type="button"
                   onClick={() => onThemeChange?.("system")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     themeMode === "system"
-                      ? "bg-primary text-primary-foreground font-bold"
+                      ? "bg-primary text-black font-extrabold shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -742,7 +786,7 @@ export function Navbar({
                     onAuthOpen("register");
                     setMenuOpen(false);
                   }}
-                  className="w-full py-3 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity text-sm shadow-sm"
+                  className="w-full py-3 rounded-full bg-primary text-black font-extrabold hover:opacity-95 transition-opacity text-sm shadow-md shadow-primary/20 cursor-pointer"
                 >
                   Get Started — Free
                 </button>
@@ -751,7 +795,7 @@ export function Navbar({
                     onAuthOpen("login");
                     setMenuOpen(false);
                   }}
-                  className="w-full py-3 rounded-full border border-border text-foreground font-medium text-sm hover:border-primary/40 transition-colors"
+                  className="w-full py-3 rounded-full border border-border text-foreground font-medium text-sm hover:border-primary/40 transition-colors cursor-pointer"
                 >
                   Sign In
                 </button>

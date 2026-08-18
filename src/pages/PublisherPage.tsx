@@ -155,7 +155,7 @@ export function PublisherPage({ onNavigate, categories }: PublisherPageProps) {
   ];
 
   const inputClass =
-    "w-full px-5 py-3.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+    "w-full px-5 py-3.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-base sm:text-sm";
 
   return (
     <motion.main
@@ -487,11 +487,11 @@ export function PublisherPage({ onNavigate, categories }: PublisherPageProps) {
               <button
                 type="submit"
                 disabled={status === "loading" || form.categories.length === 0}
-                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 cursor-pointer"
+                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-black font-extrabold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] disabled:opacity-60 transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
               >
                 {status === "loading" ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />{" "}
+                    <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />{" "}
                     Submitting...
                   </>
                 ) : (

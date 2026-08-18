@@ -93,9 +93,6 @@ export function App() {
 
   const handleThemeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
-    toast.success(
-      `Theme set to ${mode === "system" ? "System Preference" : mode.toUpperCase()}`
-    );
   };
 
   const toggleTheme = () =>
@@ -326,7 +323,9 @@ export function App() {
         .eq("user_id", userId);
 
       if (!error && data) {
-        setWishlistProductIds(data.map((w: any) => w.product_id));
+        const ids = data.map((w: any) => w.product_id);
+        setWishlistProductIds(ids);
+        setAuthUser((prev) => (prev ? { ...prev, wishlist: ids } : null));
       }
     } catch (err) {
       console.error("Error loading wishlist:", err);
@@ -453,7 +452,9 @@ export function App() {
 
     const isFav = wishlistProductIds.includes(productId);
     if (isFav) {
-      setWishlistProductIds((prev) => prev.filter((id) => id !== productId));
+      const next = wishlistProductIds.filter((id) => id !== productId);
+      setWishlistProductIds(next);
+      setAuthUser((prev) => (prev ? { ...prev, wishlist: next } : null));
       await supabase
         .from("wishlist")
         .delete()
@@ -461,7 +462,9 @@ export function App() {
         .eq("product_id", productId);
       toast.info("Removed from saved resources.");
     } else {
-      setWishlistProductIds((prev) => [...prev, productId]);
+      const next = [...wishlistProductIds, productId];
+      setWishlistProductIds(next);
+      setAuthUser((prev) => (prev ? { ...prev, wishlist: next } : null));
       await supabase
         .from("wishlist")
         .insert({ user_id: authUser.id, product_id: productId });
@@ -487,6 +490,9 @@ export function App() {
     setPage(newPage);
     if (newPage !== "product") {
       setSelectedProduct(null);
+    }
+    if (newPage !== "browse") {
+      setActiveCategoryId(null);
     }
     pushRoute({ page: newPage });
   };

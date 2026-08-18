@@ -12,6 +12,7 @@ interface FeaturedProductsProps {
   onWishlistToggle: (id: string) => void;
   onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
   categories: Category[];
+  wishlist?: string[];
 }
 
 export function FeaturedProducts({
@@ -22,25 +23,26 @@ export function FeaturedProducts({
   onWishlistToggle,
   onAuthOpen,
   categories,
+  wishlist,
 }: FeaturedProductsProps) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
   const featured = products.slice(0, 6);
 
   return (
-    <section id="featured" ref={ref} className="py-24 lg:py-32">
-      <div className="max-w-7xl mx-auto px-6 lg:px-10">
+    <section id="featured" ref={ref} className="py-16 sm:py-24 lg:py-32">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5 }}
-          className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-16"
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 mb-10 sm:mb-16"
         >
           <div>
-            <span className="text-primary font-mono text-sm font-medium tracking-widest uppercase">
+            <span className="text-primary font-mono text-xs sm:text-sm font-medium tracking-widest uppercase">
               Top Free Picks
             </span>
-            <h2 className="mt-4 text-4xl lg:text-5xl font-display font-extrabold text-foreground">
+            <h2 className="mt-2 sm:mt-4 text-2xl sm:text-4xl lg:text-5xl font-display font-extrabold text-foreground break-words">
               Featured Community Resources
             </h2>
           </div>
@@ -71,6 +73,12 @@ export function FeaturedProducts({
                 onWishlistToggle={onWishlistToggle}
                 onAuthOpen={onAuthOpen}
                 categories={categories}
+                wishlist={wishlist}
+                isWishlisted={
+                  wishlist
+                    ? wishlist.includes(product.id)
+                    : Boolean(authUser?.wishlist?.includes(product.id))
+                }
               />
             </motion.div>
           ))}

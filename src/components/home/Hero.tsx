@@ -12,7 +12,7 @@ interface HeroProps {
 export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [cmsContent, setCmsContent] = useState(() => {
+  const [cmsContent] = useState(() => {
     try {
       const saved = localStorage.getItem("ld_custom_home");
       if (saved) return JSON.parse(saved);
@@ -101,7 +101,7 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
                     ease: [0.16, 1, 0.3, 1],
                     delay: 0.1 * i,
                   }}
-                  className={`text-6xl md:text-7xl lg:text-8xl font-display font-extrabold leading-[0.9] tracking-tight mb-1 ${
+                  className={`text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold leading-[0.95] tracking-tight mb-1 ${
                     i === 1 ? "text-primary" : "text-foreground"
                   }`}
                 >
@@ -114,7 +114,7 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.45 }}
-              className="text-muted-foreground text-lg max-w-lg leading-relaxed mt-6 mb-8"
+              className="text-muted-foreground text-base sm:text-lg max-w-lg leading-relaxed mt-6 mb-8"
             >
               {cmsContent.subheading}
             </motion.p>
@@ -126,10 +126,10 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
               transition={{ duration: 0.6, delay: 0.55 }}
               className="relative max-w-lg"
             >
-              <div className="flex items-center bg-card border border-border rounded-2xl shadow-xl hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-200">
+              <div className="flex items-center bg-card border border-border rounded-2xl shadow-xl hover:border-primary/40 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-200 p-1">
                 <Search
                   size={18}
-                  className="ml-5 text-muted-foreground shrink-0"
+                  className="ml-4 text-muted-foreground shrink-0"
                 />
                 <input
                   type="text"
@@ -137,17 +137,17 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   placeholder="Search UI kits, templates, icons..."
-                  className="flex-1 px-4 py-4 bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none text-base"
+                  className="flex-1 px-3 py-3.5 bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none text-base min-w-0"
                 />
                 <button
                   onClick={handleSearch}
-                  className="mr-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shrink-0 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity shrink-0 cursor-pointer"
                 >
                   Search
                 </button>
               </div>
 
-              {/* Quick category pills */}
+              {/* Quick category pills (Wrapped cleanly) */}
               <div className="flex flex-wrap gap-2 mt-3">
                 {quickCategories.map((cat) => (
                   <button
@@ -176,7 +176,7 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
                 className="group flex items-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] transition-all duration-300 cursor-pointer"
               >
                 <Sparkles size={18} className="text-primary-foreground" />
-                {cmsContent.primaryCtaText || "Browse Free Kits"}
+                <span>{cmsContent.primaryCtaText || "Browse Free Kits"}</span>
                 <ArrowUpRight
                   size={18}
                   className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
@@ -186,7 +186,7 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
                 onClick={() => onAuthOpen("register")}
                 className="group flex items-center gap-3 px-8 py-4 rounded-full border border-border bg-card text-foreground font-semibold text-base hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 cursor-pointer"
               >
-                {cmsContent.secondaryCtaText || "Join for Free"}
+                <span>{cmsContent.secondaryCtaText || "Join for Free"}</span>
                 <Users size={16} />
               </button>
             </motion.div>
