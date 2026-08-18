@@ -1,18 +1,38 @@
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, CheckCircle, Mail, X, Eye, EyeOff } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  Mail,
+  X,
+  Eye,
+  EyeOff,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Lock,
+  User,
+} from "lucide-react";
+import { LayeratLogo } from "../brand/LayeratLogo";
 import { supabase } from "../../lib/supabase";
-import type { AuthUser } from "../../types";
-
+import { toast } from "sonner";
+import type { AuthUser, Page } from "../../types";
 
 interface AuthModalProps {
   mode: "login" | "register" | "forgot_password";
   onClose: () => void;
   onSuccess: (user: AuthUser) => void;
   onSwitchMode: (mode: "login" | "register" | "forgot_password") => void;
+  onNavigate?: (page: Page) => void;
 }
 
-function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
+export function AuthModal({
+  mode,
+  onClose,
+  onSuccess,
+  onSwitchMode,
+  onNavigate,
+}: AuthModalProps) {
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -27,7 +47,7 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const inputClass =
-    "w-full px-5 py-3.5 pr-12 rounded-xl border border-border bg-input-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
+    "w-full px-4 py-3.5 pr-12 rounded-2xl border border-border bg-background/80 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -41,30 +61,31 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
     if (mode === "forgot_password") {
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(
-          form.email,
+          form.email.trim(),
           {
             redirectTo: window.location.origin,
           }
         );
 
-        // حتى لو الإيميل مش موجود أو في rate limit، نعرض رسالة عامة
-        // ما نكشفش إذا الحساب موجود ولا لا
         if (error && error.message.toLowerCase().includes("rate limit")) {
-          setErrorMsg("Too many requests. Please wait a bit and try again.");
+          setErrorMsg("Too many requests. Please wait a moment and try again.");
+          toast.error("Too many requests. Please wait a moment.");
           setStatus("error");
           return;
         }
 
         setStatus("reset_success");
+        toast.success("Password reset link sent to your email.");
         return;
       } catch (err: any) {
-        // في معظم الحالات نعرض نجاح عام
         setStatus("reset_success");
         return;
       }
     }
+
     if (mode === "register" && form.password !== form.confirmPassword) {
-      setErrorMsg("Passwords do not match.");
+      setErrorMsg("Passwords do not match. Please verify your password.");
+      toast.error("Passwords do not match.");
       setStatus("error");
       return;
     }
@@ -72,37 +93,43 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
     try {
       if (mode === "register") {
         const { data, error } = await supabase.auth.signUp({
-          email: form.email,
+          email: form.email.trim(),
           password: form.password,
           options: {
             data: {
-              full_name: form.name,
+              full_name: form.name.trim(),
             },
           },
         });
 
         if (error) throw error;
 
+        // If email confirmation is required in Supabase
         if (data.user && !data.session) {
           setStatus("check_email");
+          toast.info("Confirmation email sent! Please check your inbox.");
           return;
         }
 
+        // If email confirmation is disabled or auto-confirmed
         if (data.user && data.session) {
+          const userEmail = (data.user.email || form.email).toLowerCase().trim();
+          const isAdmin = userEmail === "ahmedazy.uxui@gmail.com";
           const newUser: AuthUser = {
             id: data.user.id,
-            name: form.name || data.user.email?.split("@")[0] || "User",
+            name: form.name.trim() || data.user.email?.split("@")[0] || "User",
             email: data.user.email || form.email,
-            role: "user",
+            role: isAdmin ? "admin" : "user",
             purchases: [],
             wishlist: [],
             createdAt: data.user.created_at || new Date().toISOString(),
           };
+          toast.success("Account created successfully! Welcome to Layerat.");
           onSuccess(newUser);
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: form.email,
+          email: form.email.trim(),
           password: form.password,
         });
 
@@ -111,9 +138,14 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
         if (data.user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role, full_name")
+            .select("role, full_name, avatar_url")
             .eq("id", data.user.id)
             .maybeSingle();
+
+          const userEmail = (data.user.email || form.email).toLowerCase().trim();
+          const isAdmin =
+            userEmail === "ahmedazy.uxui@gmail.com" ||
+            profile?.role === "admin";
 
           const loggedUser: AuthUser = {
             id: data.user.id,
@@ -123,58 +155,28 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
               data.user.email?.split("@")[0] ||
               "User",
             email: data.user.email || form.email,
-            role: (profile?.role as "user" | "admin") || "user",
+            avatar: profile?.avatar_url || undefined,
+            role: isAdmin ? "admin" : "user",
             purchases: [],
             wishlist: [],
             createdAt: data.user.created_at || new Date().toISOString(),
           };
+          toast.success(`Welcome back, ${loggedUser.name}!`);
           onSuccess(loggedUser);
         }
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Something went wrong. Please try again.");
+      console.error("Auth error:", err);
+      const msg =
+        err.message ||
+        (mode === "login"
+          ? "Invalid email or password."
+          : "Failed to sign up.");
+      setErrorMsg(msg);
+      toast.error(msg);
       setStatus("error");
     }
-    // شيلنا الـ finally اللي كان بيرجع status لـ idle بالغلط
   };
-
-  const renderPasswordField = (
-    name: "password" | "confirmPassword",
-    value: string,
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
-    placeholder: string,
-    label: string,
-    show: boolean,
-    setShow: (value: boolean) => void,
-    required: boolean = true,
-    minLength?: number
-  ) => (
-    <div className="relative">
-      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-        {label}
-      </label>
-      <input
-        name={name}
-        type={show ? "text" : "password"}
-        value={value}
-        onChange={onChange}
-        required={required}
-        placeholder={placeholder}
-        minLength={minLength}
-        className={inputClass}
-      />
-      <button
-        type="button"
-        aria-label={
-          show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`
-        }
-        onClick={() => setShow(!show)}
-        className="absolute right-3 top-[42px] flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        {show ? <EyeOff size={16} /> : <Eye size={16} />}
-      </button>
-    </div>
-  );
 
   const isResetSuccess = status === "reset_success";
   const isCheckEmail = status === "check_email";
@@ -190,46 +192,47 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
         <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          initial={{ opacity: 0, y: 30, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.97 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-2xl"
+          exit={{ opacity: 0, y: 20, scale: 0.96 }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          className="relative w-full max-w-md bg-card border border-border rounded-3xl p-7 sm:p-8 shadow-2xl overflow-hidden"
         >
+          {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+            className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full border border-border hover:border-primary/40 hover:bg-primary/10 transition-all duration-200 cursor-pointer z-10 text-muted-foreground hover:text-foreground"
           >
             <X size={15} />
           </button>
 
-          <div
-            className="text-3xl text-foreground leading-none mb-2"
-            style={{ fontFamily: "'Cookie', cursive" }}
-          >
-            Layerat<span style={{ color: "#aaff38" }}>.</span>
+          {/* Brand Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="inline-flex items-center">
+              <LayeratLogo height={22} className="h-5.5 w-auto" />
+            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+              <Sparkles size={11} /> 100% Free Library
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground mb-8 font-mono">
-            Design Studio Marketplace
-          </p>
 
           {isCheckEmail ? (
-            <>
-              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <CheckCircle size={28} />
+            <div className="py-4 text-center">
+              <div className="mb-5 flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-lg shadow-primary/10">
+                <CheckCircle size={32} />
               </div>
-              <h2 className="text-xl font-display font-bold text-foreground mb-3">
-                Check your email
+              <h2 className="text-xl font-display font-bold text-foreground mb-2">
+                Verify your email
               </h2>
               <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                We sent a confirmation link to{" "}
-                <span className="font-semibold text-foreground">
+                We sent an activation link to{" "}
+                <span className="font-semibold text-foreground font-mono">
                   {form.email}
                 </span>
-                . Click it to verify your account, then sign in to continue.
+                . Please click the link in your inbox to activate your account and start downloading design kits.
               </p>
               <button
                 type="button"
@@ -239,25 +242,25 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
                   setErrorMsg("");
                   onSwitchMode("login");
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] transition-all duration-300"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.25)] transition-all cursor-pointer"
               >
                 Back to sign in
               </button>
-            </>
+            </div>
           ) : isResetSuccess ? (
-            <>
-              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Mail size={28} />
+            <div className="py-4 text-center">
+              <div className="mb-5 flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-lg shadow-primary/10">
+                <Mail size={32} />
               </div>
-              <h2 className="text-xl font-display font-bold text-foreground mb-3">
-                Check your email
+              <h2 className="text-xl font-display font-bold text-foreground mb-2">
+                Check your inbox
               </h2>
               <p className="text-sm text-muted-foreground leading-relaxed mb-6">
                 We sent a password reset link to{" "}
-                <span className="font-semibold text-foreground">
+                <span className="font-semibold text-foreground font-mono">
                   {form.email}
                 </span>
-                .
+                . Follow the link to set a new password for your account.
               </p>
               <button
                 type="button"
@@ -271,208 +274,241 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
                   setStatus("idle");
                   onSwitchMode("login");
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] transition-all duration-300"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.25)] transition-all cursor-pointer"
               >
                 Continue to sign in
               </button>
-            </>
+            </div>
           ) : (
             <>
-              <h2 className="text-xl font-display font-bold text-foreground mb-6">
-                {mode === "login"
-                  ? "Welcome back"
-                  : mode === "forgot_password"
-                  ? "Reset password"
-                  : "Create your account"}
-              </h2>
+              <div className="mb-6">
+                <h2 className="text-2xl font-display font-extrabold text-foreground">
+                  {mode === "login"
+                    ? "Welcome back"
+                    : mode === "forgot_password"
+                    ? "Reset password"
+                    : "Create your account"}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {mode === "login"
+                    ? "Sign in with your email to unlock one-click downloads"
+                    : mode === "forgot_password"
+                    ? "Enter your email to receive recovery instructions"
+                    : "Get free access to hundreds of Figma kits & components"}
+                </p>
+              </div>
 
+              {/* ── EMAIL & PASSWORD FORM ─────────────────────────────────── */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === "register" && (
                   <div>
-                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
+                    <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-semibold">
                       Full Name
                     </label>
-                    <input
-                      name="name"
-                      value={form.name}
-                      onChange={handleChange}
-                      required
-                      placeholder="Your name"
-                      className={inputClass}
-                    />
+                    <div className="relative">
+                      <input
+                        name="name"
+                        value={form.name}
+                        onChange={handleChange}
+                        required
+                        placeholder="e.g. Ahmed Al-Azaiza"
+                        className={inputClass}
+                      />
+                      <User
+                        size={16}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none"
+                      />
+                    </div>
                   </div>
                 )}
+
+                <div>
+                  <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-semibold">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <input
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      required
+                      placeholder="name@company.com"
+                      className={inputClass}
+                    />
+                    <Mail
+                      size={16}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none"
+                    />
+                  </div>
+                </div>
 
                 {mode !== "forgot_password" && (
                   <div>
-                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                      Email
-                    </label>
-                    <input
-                      name="email"
-                      type="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      required
-                      placeholder="you@example.com"
-                      className={inputClass}
-                    />
-                  </div>
-                )}
-
-                {mode === "forgot_password" ? (
-                  <div>
-                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                      Email
-                    </label>
-                    <input
-                      name="email"
-                      type="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      required
-                      placeholder="you@example.com"
-                      className={inputClass}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    {renderPasswordField(
-                      "password",
-                      form.password,
-                      handleChange,
-                      "••••••••",
-                      "Password",
-                      showPassword,
-                      setShowPassword,
-                      true,
-                      6
-                    )}
-
-                    {mode === "register" &&
-                      renderPasswordField(
-                        "confirmPassword",
-                        form.confirmPassword,
-                        handleChange,
-                        "••••••••",
-                        "Confirm Password",
-                        showConfirmPassword,
-                        setShowConfirmPassword,
-                        true
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide font-semibold">
+                        Password
+                      </label>
+                      {mode === "login" && (
+                        <button
+                          type="button"
+                          onClick={() => onSwitchMode("forgot_password")}
+                          className="text-xs text-primary font-medium hover:underline cursor-pointer"
+                        >
+                          Forgot password?
+                        </button>
                       )}
-                  </>
-                )}
-
-                {mode === "login" && (
-                  <div className="flex justify-end -mt-1">
-                    <button
-                      type="button"
-                      onClick={() => onSwitchMode("forgot_password")}
-                      className="text-xs text-primary hover:underline font-medium"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                )}
-
-                {status === "error" && errorMsg && (
-                  <div className="flex items-center gap-2 text-sm text-destructive-foreground bg-destructive/20 rounded-xl px-4 py-3">
-                    <AlertCircle size={14} />
-                    {errorMsg}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={form.password}
+                        onChange={handleChange}
+                        required
+                        placeholder="••••••••"
+                        minLength={6}
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 )}
 
                 {mode === "register" && (
-                  <p className="text-[11px] text-muted-foreground/70 leading-relaxed text-center">
+                  <div>
+                    <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-semibold">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        name="confirmPassword"
+                        value={form.confirmPassword}
+                        onChange={handleChange}
+                        required
+                        placeholder="••••••••"
+                        minLength={6}
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {errorMsg && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2"
+                  >
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{errorMsg}</span>
+                  </motion.div>
+                )}
+
+                {/* Consent Terms & Privacy on Register */}
+                {mode === "register" && (
+                  <p className="text-[11px] text-muted-foreground/80 leading-relaxed pt-1">
                     By creating an account, you agree to our{" "}
                     <button
                       type="button"
-                      onClick={() => {}}
-                      className="text-primary hover:underline font-medium"
+                      onClick={() => {
+                        onClose();
+                        if (onNavigate) {
+                          onNavigate("terms");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                      }}
+                      className="text-foreground underline hover:text-primary font-medium cursor-pointer"
                     >
-                      Terms of Use
+                      Terms of Service
                     </button>{" "}
                     and{" "}
                     <button
                       type="button"
-                      onClick={() => {}}
-                      className="text-primary hover:underline font-medium"
+                      onClick={() => {
+                        onClose();
+                        if (onNavigate) {
+                          onNavigate("privacy");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                      }}
+                      className="text-foreground underline hover:text-primary font-medium cursor-pointer"
                     >
                       Privacy Policy
                     </button>
                     .
                   </p>
                 )}
-                {(status as string) === "reset_success" &&
-                  mode === "forgot_password" && (
-                    <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                      If an account exists with this email, you will receive a
-                      password reset link shortly.
-                    </p>
-                  )}
 
-                {mode === "forgot_password" ? (
-                  <button
-                    type="submit"
-                    disabled={status === "loading"}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2"
-                  >
-                    {status === "loading" ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                        Sending link...
-                      </span>
-                    ) : (
-                      "Send reset link"
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={status === "loading"}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_40px_rgba(170,255,56,0.25)] disabled:opacity-60 transition-all duration-300 mt-2"
-                  >
-                    {status === "loading" ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                {/* Primary Submit Button */}
+                <button
+                  type="submit"
+                  disabled={status === "loading"}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_35px_rgba(170,255,56,0.3)] transition-all duration-300 cursor-pointer disabled:opacity-60 mt-2"
+                >
+                  {status === "loading" ? (
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>
                         {mode === "login"
-                          ? "Signing in..."
-                          : "Creating account..."}
+                          ? "Sign in"
+                          : mode === "forgot_password"
+                          ? "Send Reset Link"
+                          : "Create Free Account"}
                       </span>
-                    ) : mode === "login" ? (
-                      "Sign In"
-                    ) : (
-                      "Create Account"
-                    )}
-                  </button>
-                )}
+                      <ArrowRight size={15} />
+                    </>
+                  )}
+                </button>
               </form>
 
-              <p className="text-center text-sm text-muted-foreground mt-6">
-                {mode === "login"
-                  ? "New to Layerat?"
-                  : mode === "register"
-                  ? "Already have an account?"
-                  : "Remembered your password?"}{" "}
-                <button
-                  onClick={() =>
-                    onSwitchMode(
-                      mode === "login"
-                        ? "register"
-                        : mode === "register"
-                        ? "login"
-                        : "login"
-                    )
-                  }
-                  className="text-primary font-semibold hover:underline"
-                >
-                  {mode === "login"
-                    ? "Create account"
-                    : mode === "register"
-                    ? "Sign in"
-                    : "Back to sign in"}
-                </button>
-              </p>
+              {/* Mode Switcher */}
+              <div className="mt-5 pt-4 border-t border-border/60 text-center">
+                {mode === "login" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Don't have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => onSwitchMode("register")}
+                      className="text-primary font-bold hover:underline cursor-pointer"
+                    >
+                      Create one for free
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => onSwitchMode("login")}
+                      className="text-primary font-bold hover:underline cursor-pointer"
+                    >
+                      Sign in
+                    </button>
+                  </p>
+                )}
+              </div>
             </>
           )}
         </motion.div>
@@ -480,4 +516,3 @@ function AuthModal({ mode, onClose, onSuccess, onSwitchMode }: AuthModalProps) {
     </AnimatePresence>
   );
 }
-export { AuthModal };
