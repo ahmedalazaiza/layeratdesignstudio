@@ -71,13 +71,13 @@ export function ProductCard({
           aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
           className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-200 cursor-pointer shadow-md z-10 ${
             isInWishlist
-              ? "bg-rose-500 text-white scale-110 shadow-rose-500/40 ring-2 ring-white/30"
+              ? "bg-black/70 text-primary border border-primary/40 scale-105"
               : "bg-black/50 text-white/90 hover:text-white hover:bg-black/70 hover:scale-105"
           }`}
         >
           <Heart
             size={14}
-            className={isInWishlist ? "fill-current text-white" : "text-white/90"}
+            className={isInWishlist ? "fill-primary text-primary" : "text-white/90"}
           />
         </button>
 

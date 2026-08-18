@@ -409,7 +409,7 @@ export function AboutPage({ onNavigate, categories }: AboutPageProps) {
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center max-w-md mx-auto sm:max-w-none">
             <button
               onClick={() => onNavigate("browse")}
-              className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-primary text-black font-extrabold text-sm sm:text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
+              className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-primary text-primary-foreground font-bold text-sm sm:text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
             >
               <span>Browse Free Resources</span>
               <ArrowUpRight

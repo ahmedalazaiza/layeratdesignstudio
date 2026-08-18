@@ -14,9 +14,12 @@ import {
   Layout,
   Settings,
   Package,
+  ArrowRight,
+  Layers,
 } from "lucide-react";
 import { UnverifiedEmailBanner } from "./UnverifiedEmailBanner";
 import { LayeratLogo } from "../brand/LayeratLogo";
+import { CategoryMegaMenu } from "./CategoryMegaMenu";
 import type { Page, AuthUser, Category } from "../../types";
 
 export type ThemeMode = "light" | "dark" | "system";
@@ -69,7 +72,7 @@ interface NavbarProps {
   onSearch: (q: string) => void;
   wishlistCount: number;
   categories: Category[];
-  onCategoryClick: (categoryId: string) => void;
+  onCategoryClick: (categoryId: string, subcategoryId?: string | null) => void;
   activeCategoryId: string | null;
   onVerificationSuccess?: () => void;
 }
@@ -97,8 +100,22 @@ export function Navbar({
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchVal, setSearchVal] = useState("");
+  const [activeMegaMenuId, setActiveMegaMenuId] = useState<string | null>(null);
+  const [mobileExpandedCats, setMobileExpandedCats] = useState<string[]>([]);
+  const megaMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const isSolid = scrollY > 5 || page !== "home" || menuOpen || searchOpen;
+  const isSolid = scrollY > 5 || page !== "home" || menuOpen || searchOpen || activeMegaMenuId !== null;
+
+  const handleMouseEnterCategory = (catId: string) => {
+    if (megaMenuTimeoutRef.current) clearTimeout(megaMenuTimeoutRef.current);
+    setActiveMegaMenuId(catId);
+  };
+
+  const handleMouseLeaveCategory = () => {
+    megaMenuTimeoutRef.current = setTimeout(() => {
+      setActiveMegaMenuId(null);
+    }, 160);
+  };
 
   const isAdmin =
     authUser &&
@@ -111,10 +128,11 @@ export function Navbar({
       setSearchOpen(false);
       setSearchVal("");
       setMenuOpen(false);
+      setActiveMegaMenuId(null);
     }
   };
 
-  // Close profile dropdown on outside click or ESC key
+  // Close profile dropdown & mega menu on outside click or ESC key
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (
@@ -130,10 +148,11 @@ export function Navbar({
         setProfileOpen(false);
         setSearchOpen(false);
         setMenuOpen(false);
+        setActiveMegaMenuId(null);
       }
     };
 
-    if (profileOpen || searchOpen || menuOpen) {
+    if (profileOpen || searchOpen || menuOpen || activeMegaMenuId) {
       document.addEventListener("mousedown", handleOutsideClick);
       document.addEventListener("keydown", handleKeyDown);
     }
@@ -141,7 +160,7 @@ export function Navbar({
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [profileOpen, searchOpen, menuOpen]);
+  }, [profileOpen, searchOpen, menuOpen, activeMegaMenuId]);
 
   // Initials fallback for user avatar
   const initials = authUser
@@ -154,7 +173,6 @@ export function Navbar({
     : "";
 
   const isHomeActive = page === "home";
-  const isAllResourcesActive = page === "browse" && !activeCategoryId;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 pointer-events-auto">
@@ -165,92 +183,97 @@ export function Navbar({
       />
 
       <nav
-        className={`w-full transition-all duration-300 border-b ${
+        className={`relative w-full transition-all duration-300 border-b ${
           isSolid
             ? "bg-card/98 dark:bg-[#080c09]/98 backdrop-blur-2xl border-border/80 shadow-md shadow-black/5 dark:shadow-black/30"
             : "bg-background/90 dark:bg-[#080c09]/90 backdrop-blur-xl border-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 lg:px-10 flex items-center justify-between h-16 lg:h-20 gap-4">
-        {/* Brand Logo */}
-        <button
-          onClick={() => {
-            onNavigate("home");
-            setMenuOpen(false);
-          }}
-          className="shrink-0 hover:opacity-85 transition-opacity cursor-pointer flex items-center"
-          title="Layerat Design Studio"
-        >
-          <LayeratLogo isDark={isDark} height={28} className="h-6 sm:h-7.5 w-auto" />
-        </button>
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 flex items-center justify-between h-16 lg:h-20 gap-4">
+          {/* Left section: Brand Logo + Desktop Nav Links */}
+          <div className="flex items-center gap-4 xl:gap-7 flex-1 min-w-0">
+            {/* Brand Logo */}
+            <button
+              onClick={() => {
+                onNavigate("home");
+                setMenuOpen(false);
+              }}
+              className="shrink-0 hover:opacity-85 transition-opacity cursor-pointer flex items-center"
+              title="Layerat Design Studio"
+            >
+              <LayeratLogo isDark={isDark} height={28} className="h-6 sm:h-7.5 w-auto" />
+            </button>
 
-        {/* Desktop center nav */}
-        <div className="hidden md:flex items-center gap-1.5 ml-6">
-          <button
-            onClick={() => onNavigate("home")}
-            className={`text-sm transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
-              isHomeActive
-                ? "text-primary font-bold bg-primary/10"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Home
-            <span
-              className={`absolute -bottom-0.5 left-3 right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                isHomeActive
-                  ? "scale-x-100"
-                  : "scale-x-0 group-hover:scale-x-100"
-              }`}
-            />
-          </button>
-
-          <button
-            onClick={() => onNavigate("browse")}
-            className={`text-sm transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
-              isAllResourcesActive
-                ? "text-primary font-bold bg-primary/10"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All Free Resources
-            <span
-              className={`absolute -bottom-0.5 left-3 right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                isAllResourcesActive
-                  ? "scale-x-100"
-                  : "scale-x-0 group-hover:scale-x-100"
-              }`}
-            />
-          </button>
-
-          {categories.map((cat) => {
-            const isActive = page === "browse" && activeCategoryId === cat.id;
-            return (
+            {/* Desktop Nav links */}
+            <div className="hidden lg:flex items-center gap-1 xl:gap-1.5 flex-nowrap">
               <button
-                key={cat.id}
-                onClick={() => onCategoryClick(cat.id)}
-                className={`text-sm transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
-                  isActive
+                onClick={() => onNavigate("home")}
+                className={`text-xs xl:text-sm whitespace-nowrap shrink-0 transition-colors px-2.5 xl:px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
+                  isHomeActive
                     ? "text-primary font-bold bg-primary/10"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {cat.name}
+                <span className="whitespace-nowrap">Home</span>
                 <span
-                  className={`absolute -bottom-0.5 left-3 right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                    isActive
+                  className={`absolute -bottom-0.5 left-2.5 right-2.5 xl:left-3 xl:right-3 h-0.5 bg-primary transition-transform duration-300 ${
+                    isHomeActive
                       ? "scale-x-100"
                       : "scale-x-0 group-hover:scale-x-100"
                   }`}
                 />
               </button>
-            );
-          })}
-        </div>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-2 shrink-0">
+              {categories.map((cat) => {
+                const isActive = page === "browse" && activeCategoryId === cat.id;
+                const isMenuOpen = activeMegaMenuId === cat.id;
+
+                return (
+                  <div
+                    key={cat.id}
+                    className="relative"
+                    onMouseEnter={() => handleMouseEnterCategory(cat.id)}
+                    onMouseLeave={handleMouseLeaveCategory}
+                  >
+                    <button
+                      onClick={() => {
+                        if (activeMegaMenuId === cat.id) {
+                          setActiveMegaMenuId(null);
+                        } else {
+                          setActiveMegaMenuId(cat.id);
+                        }
+                      }}
+                      className={`text-xs xl:text-sm whitespace-nowrap shrink-0 transition-colors px-2.5 xl:px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer flex items-center gap-1 xl:gap-1.5 ${
+                        isActive || isMenuOpen
+                          ? "text-primary font-bold bg-primary/10"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <span className="whitespace-nowrap">{cat.name}</span>
+                      <ChevronDown
+                        size={13}
+                        className={`transition-transform duration-200 opacity-70 group-hover:opacity-100 shrink-0 ${
+                          isMenuOpen ? "rotate-180 text-primary opacity-100" : ""
+                        }`}
+                      />
+                      <span
+                        className={`absolute -bottom-0.5 left-2.5 right-2.5 xl:left-3 xl:right-3 h-0.5 bg-primary transition-transform duration-300 ${
+                          isActive
+                            ? "scale-x-100"
+                            : "scale-x-0 group-hover:scale-x-100"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center justify-end gap-2 xl:gap-2.5 shrink-0 ml-auto">
           {/* Search toggle (desktop) */}
-          <div className="hidden md:block relative">
+          <div className="hidden lg:block relative">
             <AnimatePresence>
               {searchOpen ? (
                 <motion.div
@@ -585,13 +608,43 @@ export function Navbar({
 
           {/* Mobile menu toggle */}
           <button
-            className="md:hidden w-9 h-9 flex items-center justify-center cursor-pointer"
+            className="lg:hidden w-9 h-9 flex items-center justify-center cursor-pointer"
             onClick={() => setMenuOpen(!menuOpen)}
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
+
+      {/* Figma-Style Category Mega Menu (Centered across viewport with safe screen padding) */}
+        <AnimatePresence>
+          {activeMegaMenuId && (
+            <div
+              className="hidden lg:flex absolute top-full left-0 right-0 w-full justify-center px-4 sm:px-6 lg:px-8 z-50 pointer-events-auto"
+              onMouseEnter={() => handleMouseEnterCategory(activeMegaMenuId)}
+              onMouseLeave={handleMouseLeaveCategory}
+            >
+              {(() => {
+                const activeCat = categories.find((c) => c.id === activeMegaMenuId);
+                if (!activeCat) return null;
+                return (
+                  <CategoryMegaMenu
+                    category={activeCat}
+                    isOpen={true}
+                    onClose={() => setActiveMegaMenuId(null)}
+                    onMouseEnter={() => handleMouseEnterCategory(activeCat.id)}
+                    onMouseLeave={handleMouseLeaveCategory}
+                    onSelectCategory={(categoryId, subcatId) => {
+                      onCategoryClick(categoryId, subcatId);
+                      setActiveMegaMenuId(null);
+                    }}
+                  />
+                );
+              })()}
+            </div>
+          )}
+        </AnimatePresence>
+      </nav>
 
       {/* Mobile menu */}
       <AnimatePresence>
@@ -600,7 +653,7 @@ export function Navbar({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border px-5 pb-6"
+            className="lg:hidden bg-background/95 backdrop-blur-xl border-b border-border px-5 pb-6"
           >
             {/* Mobile search */}
             <div className="py-4 border-b border-border/50">
@@ -627,29 +680,89 @@ export function Navbar({
               <Layout size={16} className="text-primary" />
               Home
             </button>
-            <button
-              onClick={() => {
-                onNavigate("browse");
-                setMenuOpen(false);
-              }}
-              className="flex items-center gap-3 w-full text-left py-3 text-base font-medium text-foreground border-b border-border/30 transition-colors"
-            >
-              <Package size={16} className="text-primary" />
-              All Free Resources
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => {
-                  onCategoryClick(cat.id);
-                  setMenuOpen(false);
-                }}
-                className="flex items-center gap-3 w-full text-left py-2.5 text-sm text-muted-foreground hover:text-foreground border-b border-border/20 transition-colors"
-              >
-                <cat.icon size={15} style={{ color: cat.color }} />
-                <span>{cat.name}</span>
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const isExpanded = mobileExpandedCats.includes(cat.id);
+              const Icon = cat.icon || Layers;
+              const hasSubcategories = cat.subcategories && cat.subcategories.length > 0;
+
+              return (
+                <div key={cat.id} className="border-b border-border/20">
+                  <div className="flex items-center justify-between w-full">
+                    <button
+                      onClick={() => {
+                        onCategoryClick(cat.id, null);
+                        setMenuOpen(false);
+                      }}
+                      className="flex items-center gap-3 py-3 text-sm font-medium text-foreground hover:text-primary transition-colors flex-1 text-left"
+                    >
+                      <Icon size={16} style={{ color: cat.color }} />
+                      <span>{cat.name}</span>
+                    </button>
+                    {hasSubcategories && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMobileExpandedCats((prev) =>
+                            prev.includes(cat.id)
+                              ? prev.filter((id) => id !== cat.id)
+                              : [...prev, cat.id]
+                          );
+                        }}
+                        className="p-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        aria-label={`Toggle ${cat.name} subcategories`}
+                      >
+                        <ChevronDown
+                          size={15}
+                          className={`transition-transform duration-200 ${
+                            isExpanded ? "rotate-180 text-primary" : ""
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Subcategories Accordion */}
+                  <AnimatePresence>
+                    {isExpanded && hasSubcategories && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden pl-7 pr-2 pb-3 space-y-1"
+                      >
+                        {cat.subcategories.map((subcat) => (
+                          <button
+                            key={subcat.id}
+                            onClick={() => {
+                              onCategoryClick(cat.id, subcat.id);
+                              setMenuOpen(false);
+                            }}
+                            className="w-full text-left py-2 px-2.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-between group"
+                          >
+                            <span>{subcat.name}</span>
+                            <ArrowRight
+                              size={12}
+                              className="opacity-0 group-hover:opacity-100 text-primary transition-opacity"
+                            />
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => {
+                            onCategoryClick(cat.id, null);
+                            setMenuOpen(false);
+                          }}
+                          className="w-full text-left py-2 px-2.5 rounded-lg text-xs font-mono font-bold text-primary hover:underline flex items-center gap-1"
+                        >
+                          <span>View all {cat.name}</span>
+                          <ArrowRight size={11} />
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
 
             {/* Quick Page Links for Mobile */}
             <div className="py-2 border-b border-border/30 space-y-1">
@@ -699,7 +812,7 @@ export function Navbar({
                   onClick={() => onThemeChange?.("light")}
                   className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     themeMode === "light"
-                      ? "bg-primary text-black font-extrabold shadow-sm"
+                      ? "bg-primary text-primary-foreground font-bold shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -710,7 +823,7 @@ export function Navbar({
                   onClick={() => onThemeChange?.("dark")}
                   className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     themeMode === "dark"
-                      ? "bg-primary text-black font-extrabold shadow-sm"
+                      ? "bg-primary text-primary-foreground font-bold shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -721,7 +834,7 @@ export function Navbar({
                   onClick={() => onThemeChange?.("system")}
                   className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     themeMode === "system"
-                      ? "bg-primary text-black font-extrabold shadow-sm"
+                      ? "bg-primary text-primary-foreground font-bold shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -786,7 +899,7 @@ export function Navbar({
                     onAuthOpen("register");
                     setMenuOpen(false);
                   }}
-                  className="w-full py-3 rounded-full bg-primary text-black font-extrabold hover:opacity-95 transition-opacity text-sm shadow-md shadow-primary/20 cursor-pointer"
+                  className="w-full py-3 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-95 transition-opacity text-sm shadow-md shadow-primary/20 cursor-pointer"
                 >
                   Get Started — Free
                 </button>
@@ -804,7 +917,6 @@ export function Navbar({
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
-  </header>
-);
+    </header>
+  );
 }

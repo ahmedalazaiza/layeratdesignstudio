@@ -62,20 +62,25 @@ interface LogoProps {
  */
 export function LayeratIconSvg({
   color,
+  isDark,
   className = "",
   size = 28,
 }: {
   color?: string;
+  isDark?: boolean;
   className?: string;
   size?: number | string;
 }) {
+  const hasExplicitDark = typeof isDark === "boolean";
+  const barFill = color || (hasExplicitDark ? (isDark ? "#aaff38" : "#1a4d22") : undefined);
+
   return (
     <svg
       viewBox="0 0 106 100"
       width={size}
       height={size}
-      fill={color || "currentColor"}
-      className={className}
+      fill={barFill}
+      className={`${hasExplicitDark || color ? "" : "fill-[#1a4d22] dark:fill-[#aaff38]"} ${className}`}
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* Top Bar (Shifted Right) */}
@@ -92,7 +97,7 @@ export function LayeratIconSvg({
  * Pure Vector SVG Full Logo (Mark + Typography)
  */
 export function LayeratLogoSvg({
-  isDark = true,
+  isDark,
   className = "",
   height = 36,
 }: {
@@ -100,9 +105,22 @@ export function LayeratLogoSvg({
   className?: string;
   height?: number | string;
 }) {
-  const barColor = isDark ? "#aaff38" : "#123616";
-  const titleColor = isDark ? "#ffffff" : "#0f172a";
-  const subtitleColor = isDark ? "rgba(255,255,255,0.7)" : "rgba(15,23,42,0.7)";
+  const hasExplicitDark = typeof isDark === "boolean";
+  const barFill = hasExplicitDark
+    ? isDark
+      ? "#aaff38"
+      : "#1a4d22"
+    : undefined;
+  const titleFill = hasExplicitDark
+    ? isDark
+      ? "#ffffff"
+      : "#080c09"
+    : undefined;
+  const subtitleFill = hasExplicitDark
+    ? isDark
+      ? "rgba(255,255,255,0.7)"
+      : "rgba(8,12,9,0.7)"
+    : undefined;
 
   return (
     <svg
@@ -112,7 +130,10 @@ export function LayeratLogoSvg({
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* Layerat 3-Layer Mark */}
-      <g fill={barColor}>
+      <g
+        fill={barFill}
+        className={hasExplicitDark ? "" : "fill-[#1a4d22] dark:fill-[#aaff38]"}
+      >
         <rect x="20" y="4" width="82" height="24" rx="4" />
         <rect x="4" y="38" width="82" height="24" rx="4" />
         <rect x="16" y="72" width="82" height="24" rx="4" />
@@ -122,7 +143,8 @@ export function LayeratLogoSvg({
       <text
         x="122"
         y="60"
-        fill={titleColor}
+        fill={titleFill}
+        className={hasExplicitDark ? "" : "fill-[#080c09] dark:fill-[#ffffff]"}
         fontFamily="Outfit, Inter, system-ui, -apple-system, sans-serif"
         fontWeight="900"
         fontSize="64"
@@ -135,7 +157,8 @@ export function LayeratLogoSvg({
       <text
         x="124"
         y="92"
-        fill={subtitleColor}
+        fill={subtitleFill}
+        className={hasExplicitDark ? "" : "fill-[#4a6a50] dark:fill-[rgba(255,255,255,0.7)]"}
         fontFamily="Outfit, Inter, system-ui, -apple-system, sans-serif"
         fontWeight="300"
         fontSize="22"
@@ -152,7 +175,7 @@ export function LayeratLogoSvg({
  * Automatically switches between custom CMS images or crisp vector SVGs
  */
 export function LayeratLogo({
-  isDark = true,
+  isDark,
   className = "",
   iconOnly = false,
   height = 32,
@@ -160,8 +183,14 @@ export function LayeratLogo({
 }: LogoProps) {
   const brand = useBrandLogos();
 
+  const resolvedIsDark =
+    typeof isDark === "boolean"
+      ? isDark
+      : typeof document !== "undefined" &&
+        document.documentElement.classList.contains("dark");
+
   if (iconOnly) {
-    const customIcon = isDark ? brand.iconDarkUrl : brand.iconLightUrl;
+    const customIcon = resolvedIsDark ? brand.iconDarkUrl : brand.iconLightUrl;
     if (customIcon && customIcon.length > 5 && !customIcon.startsWith("/brand/")) {
       return (
         <img
@@ -175,14 +204,14 @@ export function LayeratLogo({
 
     return (
       <LayeratIconSvg
-        color={isDark ? "#aaff38" : "#123616"}
+        isDark={isDark}
         size={height}
         className={className}
       />
     );
   }
 
-  const customLogo = isDark ? brand.logoDarkUrl : brand.logoLightUrl;
+  const customLogo = resolvedIsDark ? brand.logoDarkUrl : brand.logoLightUrl;
   if (customLogo && customLogo.length > 5 && !customLogo.startsWith("/brand/")) {
     return (
       <img

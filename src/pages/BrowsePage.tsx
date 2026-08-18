@@ -18,7 +18,9 @@ interface BrowsePageProps {
   onNavigate: (p: Page) => void;
   wishlist?: string[];
   activeCategoryId?: string | null;
+  activeSubcategoryId?: string | null;
   onCategoryChange?: (catId: string | null) => void;
+  onSubcategoryChange?: (subcatId: string | null) => void;
   initialSearchQuery?: string;
 }
 
@@ -34,7 +36,9 @@ export function BrowsePage({
   onNavigate,
   wishlist,
   activeCategoryId,
+  activeSubcategoryId,
   onCategoryChange,
+  onSubcategoryChange,
   initialSearchQuery,
 }: BrowsePageProps) {
   const handleWishlist = onToggleWishlist || onWishlistToggle || (() => {});
@@ -42,14 +46,14 @@ export function BrowsePage({
   const [filters, setFilters] = useState<BrowseFilters>({
     query: initialSearchQuery ?? initialFilters?.query ?? "",
     categoryId: activeCategoryId ?? initialFilters?.categoryId ?? null,
-    subcategoryId: initialFilters?.subcategoryId ?? null,
+    subcategoryId: activeSubcategoryId ?? initialFilters?.subcategoryId ?? null,
     isFree: null,
     sortBy: "newest",
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedCats, setExpandedCats] = useState<string[]>([]);
 
-  // Synchronize when parent updates activeCategoryId or initialSearchQuery
+  // Synchronize when parent updates activeCategoryId or initialSearchQuery or activeSubcategoryId
   useEffect(() => {
     if (activeCategoryId !== undefined) {
       setFilters((f) => ({ ...f, categoryId: activeCategoryId }));
@@ -60,6 +64,12 @@ export function BrowsePage({
       }
     }
   }, [activeCategoryId]);
+
+  useEffect(() => {
+    if (activeSubcategoryId !== undefined) {
+      setFilters((f) => ({ ...f, subcategoryId: activeSubcategoryId }));
+    }
+  }, [activeSubcategoryId]);
 
   useEffect(() => {
     if (initialSearchQuery !== undefined) {
@@ -210,7 +220,7 @@ export function BrowsePage({
             onClick={() => handleSelectCategory(null)}
             className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap ${
               filters.categoryId === null
-                ? "bg-primary text-black shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "border border-border bg-card text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -225,7 +235,7 @@ export function BrowsePage({
                 onClick={() => handleSelectCategory(cat.id)}
                 className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap ${
                   isSelected
-                    ? "bg-primary text-black shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "border border-border bg-card text-muted-foreground hover:text-foreground"
                 }`}
               >

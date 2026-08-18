@@ -242,7 +242,7 @@ export function AuthModal({
                   setErrorMsg("");
                   onSwitchMode("login");
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
               >
                 Back to sign in
               </button>
@@ -274,7 +274,7 @@ export function AuthModal({
                   setStatus("idle");
                   onSwitchMode("login");
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
               >
                 Continue to sign in
               </button>
@@ -464,10 +464,10 @@ export function AuthModal({
                 <button
                   type="submit"
                   disabled={status === "loading"}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_35px_rgba(170,255,56,0.4)] transition-all duration-300 cursor-pointer disabled:opacity-60 mt-2 shadow-md shadow-primary/20"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_35px_rgba(170,255,56,0.4)] transition-all duration-300 cursor-pointer disabled:opacity-60 mt-2 shadow-md shadow-primary/20"
                 >
                   {status === "loading" ? (
-                    <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   ) : (
                     <>
                       <span>

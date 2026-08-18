@@ -496,11 +496,11 @@ export function ProductDetailPage({
                   <button
                     onClick={handleDownload}
                     disabled={downloadStatus === "loading"}
-                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-primary text-black font-extrabold text-base hover:scale-[1.01] active:scale-[0.99] hover:shadow-[0_0_30px_rgba(170,255,56,0.4)] disabled:opacity-60 transition-all duration-300 mb-3 shadow-lg shadow-primary/20 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-primary text-primary-foreground font-bold text-base hover:scale-[1.01] active:scale-[0.99] hover:shadow-[0_0_30px_rgba(170,255,56,0.35)] disabled:opacity-60 transition-all duration-300 mb-3 shadow-lg shadow-primary/20 cursor-pointer"
                   >
                     {downloadStatus === "loading" ? (
                       <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                        <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                         Preparing download...
                       </span>
                     ) : downloadStatus === "success" ? (
@@ -653,11 +653,11 @@ export function ProductDetailPage({
             <button
               onClick={handleDownload}
               disabled={downloadStatus === "loading"}
-              className="flex-1 h-12 flex items-center justify-center gap-2 px-4 rounded-2xl bg-primary text-black font-extrabold text-sm hover:opacity-95 cursor-pointer shadow-lg shadow-primary/25 disabled:opacity-60"
+              className="flex-1 h-12 flex items-center justify-center gap-2 px-4 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-95 cursor-pointer shadow-lg shadow-primary/25 disabled:opacity-60"
             >
               {downloadStatus === "loading" ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  <span className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   Downloading...
                 </span>
               ) : downloadStatus === "success" ? (

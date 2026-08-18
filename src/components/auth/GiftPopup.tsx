@@ -314,10 +314,10 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
                       <button
                         type="submit"
                         disabled={loading || !email.trim()}
-                        className="w-full py-3.5 rounded-2xl bg-primary text-black font-extrabold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.4)] transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer shadow-md shadow-primary/20"
+                        className="w-full py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.4)] transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer shadow-md shadow-primary/20"
                       >
                         {loading ? (
-                          <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                         ) : (
                           <>
                             <Gift size={16} />
@@ -361,7 +361,7 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
                   <button
                     type="button"
                     onClick={handleDismiss}
-                    className="w-full py-3.5 rounded-2xl bg-primary text-black font-extrabold text-xs sm:text-sm hover:shadow-[0_0_20px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
+                    className="w-full py-3.5 rounded-2xl bg-primary text-primary-foreground font-bold text-xs sm:text-sm hover:shadow-[0_0_20px_rgba(170,255,56,0.3)] transition-all cursor-pointer shadow-md shadow-primary/20"
                   >
                     Got it, I'll check my inbox
                   </button>

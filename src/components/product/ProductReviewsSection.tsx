@@ -457,10 +457,10 @@ export function ProductReviewsSection({
               <button
                 type="submit"
                 disabled={submitting || !reviewText.trim()}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-primary text-black font-extrabold text-xs sm:text-sm hover:shadow-[0_0_20px_rgba(170,255,56,0.3)] transition-all cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-xs sm:text-sm hover:shadow-[0_0_20px_rgba(170,255,56,0.3)] transition-all cursor-pointer disabled:opacity-50"
               >
                 {submitting ? (
-                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                 ) : (
                   <>
                     <Star size={14} className="fill-current" />

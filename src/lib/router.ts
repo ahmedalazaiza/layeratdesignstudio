@@ -4,6 +4,7 @@ export interface RouteState {
   page: Page;
   productId?: string;
   categoryId?: string | null;
+  subcategoryId?: string | null;
   searchQuery?: string;
 }
 
@@ -73,6 +74,7 @@ export function parseCurrentRoute(): RouteState {
     return {
       page: "browse",
       categoryId: searchParams.get("category") || null,
+      subcategoryId: searchParams.get("subcategory") || null,
       searchQuery: searchParams.get("q") || "",
     };
   }
@@ -116,6 +118,7 @@ export function buildRouteUrl(route: RouteState): string {
     case "browse": {
       const params = new URLSearchParams();
       if (route.categoryId) params.set("category", route.categoryId);
+      if (route.subcategoryId) params.set("subcategory", route.subcategoryId);
       if (route.searchQuery && route.searchQuery.trim().length > 0) {
         params.set("q", route.searchQuery.trim());
       }

@@ -487,11 +487,11 @@ export function PublisherPage({ onNavigate, categories }: PublisherPageProps) {
               <button
                 type="submit"
                 disabled={status === "loading" || form.categories.length === 0}
-                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-black font-extrabold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] disabled:opacity-60 transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
+                className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:shadow-[0_0_40px_rgba(170,255,56,0.35)] disabled:opacity-60 transition-all duration-300 cursor-pointer shadow-md shadow-primary/20"
               >
                 {status === "loading" ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />{" "}
+                    <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />{" "}
                     Submitting...
                   </>
                 ) : (

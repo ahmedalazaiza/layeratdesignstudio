@@ -183,3 +183,73 @@
   ::-webkit-scrollbar-thumb { background: var(--muted-foreground); border-radius: 2px; }
   * { scrollbar-width: thin; scrollbar-color: var(--muted-foreground) transparent; }
 }
+
+/* ─── Layerat Premium Toast Styles (Bottom-Left Corner) ─── */
+[data-sonner-toaster][data-position^="bottom-left"] {
+  bottom: 24px !important;
+  left: 24px !important;
+  z-index: 99999 !important;
+}
+
+[data-sonner-toast] {
+  border-radius: 1.25rem !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  font-family: Outfit, Inter, system-ui, -apple-system, sans-serif !important;
+  padding: 14px 18px !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.dark [data-sonner-toast] {
+  background: rgba(12, 19, 14, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 25px -5px rgba(170, 255, 56, 0.1) !important;
+}
+
+:root:not(.dark) [data-sonner-toast] {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid rgba(8, 12, 9, 0.1) !important;
+  box-shadow: 0 20px 40px -10px rgba(26, 77, 34, 0.15), 0 0 0 1px rgba(8, 12, 9, 0.05) !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  border-left: 4px solid var(--primary) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  border-left: 4px solid var(--destructive) !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  border-left: 4px solid #60a5fa !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  border-left: 4px solid #f59e0b !important;
+}
+
+[data-sonner-toast] [data-title] {
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  letter-spacing: -0.01em !important;
+  color: var(--foreground) !important;
+}
+
+[data-sonner-toast] [data-description] {
+  font-size: 0.775rem !important;
+  color: var(--muted-foreground) !important;
+  margin-top: 2px !important;
+}
+
+[data-sonner-toast] [data-close-button] {
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  color: var(--muted-foreground) !important;
+  border-radius: 9999px !important;
+  transition: all 0.2s ease !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  color: var(--foreground) !important;
+  border-color: var(--primary) !important;
+}

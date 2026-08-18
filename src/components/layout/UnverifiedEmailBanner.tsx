@@ -150,12 +150,12 @@ export function UnverifiedEmailBanner({
             <button
               onClick={handleResend}
               disabled={resending}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary text-black font-mono font-extrabold text-[11px] hover:opacity-95 hover:shadow-[0_0_15px_rgba(170,255,56,0.4)] transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary text-primary-foreground font-mono font-bold text-[11px] hover:opacity-95 hover:shadow-[0_0_15px_rgba(170,255,56,0.4)] transition-all cursor-pointer disabled:opacity-50 shadow-sm"
             >
               {resending ? (
-                <RefreshCw size={11} className="animate-spin text-black" />
+                <RefreshCw size={11} className="animate-spin text-primary-foreground" />
               ) : (
-                <Mail size={11} className="text-black" />
+                <Mail size={11} className="text-primary-foreground" />
               )}
               <span>{resending ? "Sending..." : "Resend Link"}</span>
             </button>

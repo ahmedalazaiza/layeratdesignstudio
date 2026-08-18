@@ -247,10 +247,10 @@ export function FavoritesPage({
                       e.stopPropagation();
                       handleToggle(p.id);
                     }}
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-rose-500 text-white shadow-md shadow-rose-500/40 ring-2 ring-white/30 backdrop-blur-md flex items-center justify-center hover:scale-110 transition-all cursor-pointer z-10"
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 text-primary border border-primary/40 backdrop-blur-md flex items-center justify-center hover:scale-110 transition-all cursor-pointer z-10 shadow-md"
                     aria-label="Remove from saved resources"
                   >
-                    <Heart size={14} className="fill-current text-white" />
+                    <Heart size={14} className="fill-primary text-primary" />
                   </button>
                   <div className="absolute top-3 left-3">
                     <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold">

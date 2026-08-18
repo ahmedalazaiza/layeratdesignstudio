@@ -113,6 +113,7 @@ export function App() {
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(initialRoute.categoryId || null);
+  const [activeSubcategoryId, setActiveSubcategoryId] = useState<string | null>((initialRoute as any).subcategoryId || null);
   const [searchQuery, setSearchQuery] = useState<string>(initialRoute.searchQuery || "");
 
   // Listen to browser Back / Forward (popstate)
@@ -129,6 +130,7 @@ export function App() {
         setSelectedProduct(null);
       }
       setActiveCategoryId(currentRoute.categoryId || null);
+      setActiveSubcategoryId((currentRoute as any).subcategoryId || null);
       setSearchQuery(currentRoute.searchQuery || "");
 
       // Update document title
@@ -493,6 +495,7 @@ export function App() {
     }
     if (newPage !== "browse") {
       setActiveCategoryId(null);
+      setActiveSubcategoryId(null);
     }
     pushRoute({ page: newPage });
   };
@@ -504,12 +507,17 @@ export function App() {
     pushRoute({ page: "product", productId: prod.id }, prod);
   };
 
-  const handleCategoryClick = (catId: string) => {
+  const handleCategoryClick = (catId: string, subcatId?: string | null) => {
     setActiveCategoryId(catId);
+    setActiveSubcategoryId(subcatId || null);
     setSearchQuery("");
     setPage("browse");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    pushRoute({ page: "browse", categoryId: catId });
+    pushRoute({
+      page: "browse",
+      categoryId: catId,
+      subcategoryId: subcatId || undefined,
+    });
   };
 
   const handleSearch = async (q: string) => {
@@ -578,10 +586,10 @@ export function App() {
           message="Loading Studio Dashboard..."
         />
         <Toaster
-          position="top-center"
+          position="bottom-left"
           theme={isDark ? "dark" : "light"}
-          richColors
           closeButton
+          duration={3500}
         />
         <AdminDashboardLayout
           authUser={authUser}
@@ -646,12 +654,12 @@ export function App() {
         </div>
       )}
 
-      {/* Toast Notifications Provider */}
+      {/* Toast Notifications Provider (Bottom-Left Studio Notifications) */}
       <Toaster
-        position="top-center"
+        position="bottom-left"
         theme={isDark ? "dark" : "light"}
-        richColors
         closeButton
+        duration={3500}
       />
 
       {/* Global Navigation Bar */}
@@ -702,7 +710,9 @@ export function App() {
               wishlist={wishlistProductIds}
               onToggleWishlist={handleToggleWishlist}
               activeCategoryId={activeCategoryId}
+              activeSubcategoryId={activeSubcategoryId}
               onCategoryChange={setActiveCategoryId}
+              onSubcategoryChange={setActiveSubcategoryId}
               initialSearchQuery={searchQuery}
               authUser={authUser}
               onAuthOpen={(mode) => setAuthModal({ isOpen: true, mode })}
