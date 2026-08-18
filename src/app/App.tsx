@@ -13,7 +13,6 @@ import { TeamPage } from "../pages/TeamPage";
 import { AboutPage } from "../pages/AboutPage";
 import { TermsPage } from "../pages/TermsPage";
 import { PrivacyPage } from "../pages/PrivacyPage";
-import { AdminDashboardLayout } from "../components/admin/AdminDashboardLayout";
 import { AuthModal } from "../components/auth/AuthModal";
 import { SetNewPasswordModal } from "../components/auth/SetNewPasswordModal";
 import { GiftPopup } from "../components/auth/GiftPopup";
@@ -31,6 +30,13 @@ import {
   buildRouteUrl,
 } from "../lib/router";
 import { Layers } from "lucide-react";
+
+// Code-splitting / Lazy loading for Admin console to keep main visitor bundle ultra lean
+const AdminDashboardLayout = React.lazy(() =>
+  import("../components/admin/AdminDashboardLayout").then((m) => ({
+    default: m.AdminDashboardLayout,
+  }))
+);
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -641,17 +647,32 @@ export function App() {
           closeButton
           duration={3500}
         />
-        <AdminDashboardLayout
-          authUser={authUser}
-          onNavigate={handleNavigate}
-          categories={categories}
-          products={products}
-          isDark={isDark}
-          themeMode={themeMode}
-          onThemeChange={handleThemeChange}
-          onToggleTheme={toggleTheme}
-          onLogout={handleLogout}
-        />
+        <React.Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center animate-pulse text-primary font-bold">
+                  L
+                </div>
+                <p className="text-xs font-mono text-muted-foreground animate-pulse">
+                  Initializing Studio Console...
+                </p>
+              </div>
+            </div>
+          }
+        >
+          <AdminDashboardLayout
+            authUser={authUser}
+            onNavigate={handleNavigate}
+            categories={categories}
+            products={products}
+            isDark={isDark}
+            themeMode={themeMode}
+            onThemeChange={handleThemeChange}
+            onToggleTheme={toggleTheme}
+            onLogout={handleLogout}
+          />
+        </React.Suspense>
       </div>
     );
   }

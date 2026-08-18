@@ -1,4 +1,5 @@
 import type { Page, Product } from "../types";
+import { generateSEOMetadata, updateDOMHeadSEO } from "./seo";
 
 export interface RouteState {
   page: Page;
@@ -14,38 +15,8 @@ const SITE_NAME = "Layerat Design Studio";
  * Returns the page title matching the given route
  */
 export function getRouteTitle(route: RouteState, product?: Product | null): string {
-  switch (route.page) {
-    case "home":
-      return `${SITE_NAME} — 100% Free Figma Resources & Design Systems`;
-    case "browse":
-      if (route.searchQuery) {
-        return `Search "${route.searchQuery}" — ${SITE_NAME}`;
-      }
-      return `Browse Free Figma UI Kits & Resources — ${SITE_NAME}`;
-    case "product":
-      if (product) {
-        return `${product.title} — Free Figma Kit · ${SITE_NAME}`;
-      }
-      return `Product Details — ${SITE_NAME}`;
-    case "favorites":
-      return `My Library & Unlocked Gifts — ${SITE_NAME}`;
-    case "publisher":
-      return `Join as Creator Partner & Publisher — ${SITE_NAME}`;
-    case "about":
-      return `About Us & Mission — ${SITE_NAME}`;
-    case "team":
-      return `Our Creative Team — ${SITE_NAME}`;
-    case "terms":
-      return `Terms & Conditions — ${SITE_NAME}`;
-    case "privacy":
-      return `Privacy Policy — ${SITE_NAME}`;
-    case "profile":
-      return `My Profile & Account Settings — ${SITE_NAME}`;
-    case "admin":
-      return `Admin Console — ${SITE_NAME}`;
-    default:
-      return SITE_NAME;
-  }
+  const meta = generateSEOMetadata(route, product);
+  return meta.title;
 }
 
 /**
@@ -64,8 +35,8 @@ export function parseCurrentRoute(): RouteState {
     return { page: "admin" };
   }
 
-  // 2. Product Detail: /product/:id
-  const productMatch = pathname.match(/^\/product\/([^/]+)/);
+  // 2. Product Detail: /product/:slugOrId
+  const productMatch = pathname.match(/^\/product\/([^/?#]+)/);
   if (productMatch) {
     return {
       page: "product",
@@ -73,7 +44,7 @@ export function parseCurrentRoute(): RouteState {
     };
   }
 
-  // 3. Browse
+  // 3. Browse / Explore / Search
   if (pathname === "/browse" || pathname === "/explore") {
     return {
       page: "browse",
@@ -83,17 +54,17 @@ export function parseCurrentRoute(): RouteState {
     };
   }
 
-  // 4. Favorites / Library
+  // 4. Favorites / Saved Library
   if (pathname === "/favorites" || pathname === "/library" || pathname === "/saved") {
     return { page: "favorites" };
   }
 
-  // 5. Publisher / Join
+  // 5. Publisher / Creator Program
   if (pathname === "/publisher" || pathname === "/join" || pathname === "/creator") {
     return { page: "publisher" };
   }
 
-  // 6. About
+  // 6. About Us
   if (pathname === "/about" || pathname === "/story") {
     return { page: "about" };
   }
@@ -103,28 +74,29 @@ export function parseCurrentRoute(): RouteState {
     return { page: "team" };
   }
 
-  // 8. Terms & Privacy
-  if (pathname === "/terms" || pathname === "/terms-of-service") {
+  // 8. Terms of Service
+  if (pathname === "/terms" || pathname === "/terms-of-service" || pathname === "/license") {
     return { page: "terms" };
   }
 
+  // 9. Privacy Policy
   if (pathname === "/privacy" || pathname === "/privacy-policy") {
     return { page: "privacy" };
   }
 
-  // 9. Profile
+  // 10. Profile / Account Settings
   if (pathname === "/profile" || pathname === "/account") {
     return { page: "profile" };
   }
 
-  // Default: Home
+  // Default: Home Page
   return { page: "home" };
 }
 
 /**
  * Convert a RouteState object into a clean URL string
  */
-export function buildRouteUrl(route: RouteState): string {
+export function buildRouteUrl(route: RouteState, product?: Product | null): string {
   switch (route.page) {
     case "home":
       return "/";
@@ -138,8 +110,10 @@ export function buildRouteUrl(route: RouteState): string {
       const qs = params.toString();
       return qs ? `/browse?${qs}` : "/browse";
     }
-    case "product":
-      return route.productId ? `/product/${encodeURIComponent(route.productId)}` : "/browse";
+    case "product": {
+      const slugOrId = product?.slug || route.productId;
+      return slugOrId ? `/product/${encodeURIComponent(slugOrId)}` : "/browse";
+    }
     case "favorites":
       return "/favorites";
     case "publisher":
@@ -162,19 +136,24 @@ export function buildRouteUrl(route: RouteState): string {
 }
 
 /**
- * Update the browser URL and history without full page reload
+ * Update the browser URL and history without full page reload, while dynamically syncing SEO head tags
  */
-export function pushRoute(route: RouteState, product?: Product | null, replace: boolean = false) {
+export function pushRoute(
+  route: RouteState,
+  product?: Product | null,
+  replace: boolean = false
+): void {
   if (typeof window === "undefined" || !window.history) return;
 
-  const url = buildRouteUrl(route);
-  const title = getRouteTitle(route, product);
+  const url = buildRouteUrl(route, product);
+  const meta = generateSEOMetadata(route, product);
 
-  document.title = title;
+  // Sync title, description, canonical link, and JSON-LD schema dynamically
+  updateDOMHeadSEO(meta, product);
 
   if (replace) {
-    window.history.replaceState(route, title, url);
+    window.history.replaceState(route, meta.title, url);
   } else if (window.location.pathname + window.location.search !== url) {
-    window.history.pushState(route, title, url);
+    window.history.pushState(route, meta.title, url);
   }
 }

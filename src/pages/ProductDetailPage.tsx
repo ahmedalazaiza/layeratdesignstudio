@@ -20,6 +20,7 @@ import { ProductLightbox } from "../components/product/ProductLightbox";
 import { ProductReviewsSection } from "../components/product/ProductReviewsSection";
 import { Footer } from "../components/layout/Footer";
 import { supabase } from "../lib/supabase";
+import { generateSEOMetadata, updateDOMHeadSEO } from "../lib/seo";
 import { toast } from "sonner";
 import type { Product, Category, AuthUser, Page } from "../types";
 
@@ -67,6 +68,12 @@ export function ProductDetailPage({
   const isInWishlist =
     (wishlist && wishlist.includes(product.id)) ||
     (authUser?.wishlist.includes(product.id) ?? false);
+
+  // Sync SEO & Structured Data Schema
+  useEffect(() => {
+    const meta = generateSEOMetadata({ page: "product", productId: product.id }, product);
+    updateDOMHeadSEO(meta, product);
+  }, [product]);
 
   useEffect(() => {
     const loadStatsAndRecordView = async () => {

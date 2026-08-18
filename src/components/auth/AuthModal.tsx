@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { LayeratLogo } from "../brand/LayeratLogo";
 import { supabase } from "../../lib/supabase";
-import { toast } from "sonner";
+import { sanitizeAuthInput } from "../../lib/cookieStorage";
 import type { AuthUser, Page } from "../../types";
 
 interface AuthModalProps {
@@ -58,14 +58,21 @@ export function AuthModal({
     setStatus("loading");
     setErrorMsg("");
 
+    const { email, password, fullName, isValidEmail, isValidPassword } =
+      sanitizeAuthInput(form.email, form.password, form.name);
+
+    if (!isValidEmail) {
+      setErrorMsg("Please enter a valid email address.");
+      toast.error("Please enter a valid email address.");
+      setStatus("error");
+      return;
+    }
+
     if (mode === "forgot_password") {
       try {
-        const { error } = await supabase.auth.resetPasswordForEmail(
-          form.email.trim(),
-          {
-            redirectTo: window.location.origin,
-          }
-        );
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
 
         if (error && error.message.toLowerCase().includes("rate limit")) {
           setErrorMsg("Too many requests. Please wait a moment and try again.");
@@ -83,6 +90,13 @@ export function AuthModal({
       }
     }
 
+    if (!isValidPassword) {
+      setErrorMsg("Password must be at least 6 characters.");
+      toast.error("Password must be at least 6 characters.");
+      setStatus("error");
+      return;
+    }
+
     if (mode === "register" && form.password !== form.confirmPassword) {
       setErrorMsg("Passwords do not match. Please verify your password.");
       toast.error("Passwords do not match.");
@@ -93,11 +107,11 @@ export function AuthModal({
     try {
       if (mode === "register") {
         const { data, error } = await supabase.auth.signUp({
-          email: form.email.trim(),
-          password: form.password,
+          email,
+          password,
           options: {
             data: {
-              full_name: form.name.trim(),
+              full_name: fullName,
             },
           },
         });
@@ -113,12 +127,12 @@ export function AuthModal({
 
         // If email confirmation is disabled or auto-confirmed
         if (data.user && data.session) {
-          const userEmail = (data.user.email || form.email).toLowerCase().trim();
+          const userEmail = (data.user.email || email).toLowerCase().trim();
           const isAdmin = userEmail === "ahmedazy.uxui@gmail.com";
           const newUser: AuthUser = {
             id: data.user.id,
-            name: form.name.trim() || data.user.email?.split("@")[0] || "User",
-            email: data.user.email || form.email,
+            name: fullName || data.user.email?.split("@")[0] || "User",
+            email: data.user.email || email,
             role: isAdmin ? "admin" : "user",
             purchases: [],
             wishlist: [],
@@ -129,8 +143,8 @@ export function AuthModal({
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: form.email.trim(),
-          password: form.password,
+          email,
+          password,
         });
 
         if (error) throw error;
