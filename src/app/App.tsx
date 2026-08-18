@@ -360,23 +360,24 @@ export function App() {
             session.user.user_metadata?.full_name ||
             session.user.email?.split("@")[0] ||
             "User";
-          await supabase
-            .from("profiles")
-            .upsert(
-              {
-                id: session.user.id,
-                email: session.user.email,
-                full_name: defaultName,
-                avatar_url:
-                  session.user.user_metadata?.avatar_url ||
-                  session.user.user_metadata?.picture ||
-                  null,
-                role: isAdmin ? "admin" : "user",
-                provider: session.user.app_metadata?.provider || "email",
-              },
-              { onConflict: "id" }
-            )
-            .catch(() => {});
+          try {
+            await supabase
+              .from("profiles")
+              .upsert(
+                {
+                  id: session.user.id,
+                  email: session.user.email,
+                  full_name: defaultName,
+                  avatar_url:
+                    session.user.user_metadata?.avatar_url ||
+                    session.user.user_metadata?.picture ||
+                    null,
+                  role: isAdmin ? "admin" : "user",
+                  provider: session.user.app_metadata?.provider || "email",
+                },
+                { onConflict: "id" }
+              );
+          } catch {}
         }
 
         setAuthUser({
@@ -440,23 +441,24 @@ export function App() {
               session.user.user_metadata?.full_name ||
               session.user.email?.split("@")[0] ||
               "User";
-            await supabase
-              .from("profiles")
-              .upsert(
-                {
-                  id: session.user.id,
-                  email: session.user.email,
-                  full_name: defaultName,
-                  avatar_url:
-                    session.user.user_metadata?.avatar_url ||
-                    session.user.user_metadata?.picture ||
-                    null,
-                  role: isAdmin ? "admin" : "user",
-                  provider: session.user.app_metadata?.provider || "email",
-                },
-                { onConflict: "id" }
-              )
-              .catch(() => {});
+            try {
+              await supabase
+                .from("profiles")
+                .upsert(
+                  {
+                    id: session.user.id,
+                    email: session.user.email,
+                    full_name: defaultName,
+                    avatar_url:
+                      session.user.user_metadata?.avatar_url ||
+                      session.user.user_metadata?.picture ||
+                      null,
+                    role: isAdmin ? "admin" : "user",
+                    provider: session.user.app_metadata?.provider || "email",
+                  },
+                  { onConflict: "id" }
+                );
+            } catch {}
           }
 
           setAuthUser({
