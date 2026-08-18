@@ -88,16 +88,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setAuthUser(user);
 
-      // Load user's wishlist from DB
+      // Load user's wishlist (localStorage first for instant response + graceful DB sync)
       try {
-        const { data: wlData } = await supabase
-          .from("wishlists")
-          .select("product_id")
-          .eq("user_id", sessionUser.id);
-        if (wlData && wlData.length > 0) {
-          setWishlist(wlData.map((w: any) => w.product_id));
+        const localKey = `layerat_wishlist_${sessionUser.id}`;
+        let localWl: string[] = [];
+        try {
+          const saved = localStorage.getItem(localKey);
+          if (saved) localWl = JSON.parse(saved);
+        } catch {}
+
+        if (profile?.wishlist && Array.isArray(profile.wishlist)) {
+          localWl = Array.from(new Set([...localWl, ...profile.wishlist]));
         }
-      } catch {}
+
+        setWishlist(localWl);
+
+        // Graceful DB check (only if table exists)
+        try {
+          const { data: wlData, error: wlError } = await supabase
+            .from("wishlists")
+            .select("product_id")
+            .eq("user_id", sessionUser.id);
+
+          if (!wlError && wlData && wlData.length > 0) {
+            const dbIds = wlData.map((w: any) => w.product_id);
+            const merged = Array.from(new Set([...localWl, ...dbIds]));
+            setWishlist(merged);
+            localStorage.setItem(localKey, JSON.stringify(merged));
+          }
+        } catch {}
+      } catch (err) {
+        console.warn("Profile sync notice:", err);
+      }
     } catch (err) {
       console.warn("Profile sync notice:", err);
     }
@@ -159,6 +181,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setWishlist(updated);
 
+    // Save to localStorage immediately
+    try {
+      localStorage.setItem(`layerat_wishlist_${authUser.id}`, JSON.stringify(updated));
+    } catch {}
+
+    if (exists) {
+      toast.success("Removed from wishlist");
+    } else {
+      toast.success("Added to your wishlist", {
+        description: "View all your saved UI kits in the Favorites tab.",
+      });
+    }
+
+    // Attempt DB sync in background
     try {
       if (exists) {
         await supabase
@@ -166,18 +202,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .delete()
           .eq("user_id", authUser.id)
           .eq("product_id", productId);
-        toast.success("Removed from wishlist");
       } else {
         await supabase
           .from("wishlists")
           .insert({ user_id: authUser.id, product_id: productId });
-        toast.success("Added to your wishlist", {
-          description: "View all your saved UI kits in the Favorites tab.",
-        });
       }
-    } catch (err) {
-      console.warn("Wishlist sync error:", err);
-    }
+    } catch {}
   }, [authUser, wishlist, openAuthModal]);
 
   const signOut = useCallback(async () => {
