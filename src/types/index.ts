@@ -82,6 +82,7 @@ export interface Product {
   downloads?: number;
   views?: number;
   featured?: boolean;
+  isFeatured?: boolean;
   trending?: boolean;
   isNew?: boolean;
   createdAt?: string;
@@ -98,10 +99,27 @@ export interface AuthUser {
   bio?: string;
   website?: string;
   role: "user" | "creator" | "admin";
-  purchases: string[];
-  wishlist: string[];
+  purchases?: string[];
+  wishlist?: string[];
   createdAt: string;
   isVerified?: boolean;
+  provider?: string;
+  isEmailVerified?: boolean;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  userId?: string;
+  userName: string;
+  userAvatar?: string;
+  rating: number;
+  title?: string;
+  comment: string;
+  isVerifiedPurchase?: boolean;
+  helpfulCount?: number;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ProductReview {

@@ -185,7 +185,7 @@ function AppContent() {
           setSelectedProduct(found);
           pushRoute(
             { page: "product", productId: found.slug || found.id },
-            getRouteTitle({ page: "product", productId: found.slug || found.id }, found)
+            found
           );
         }
       } else {
@@ -196,11 +196,7 @@ function AppContent() {
             categoryId: options?.categoryId,
             searchQuery: options?.searchQuery,
           },
-          getRouteTitle({
-            page: targetPage,
-            categoryId: options?.categoryId,
-            searchQuery: options?.searchQuery,
-          })
+          null
         );
       }
 
@@ -215,7 +211,7 @@ function AppContent() {
       setPage("product");
       pushRoute(
         { page: "product", productId: p.slug || p.id },
-        getRouteTitle({ page: "product", productId: p.slug || p.id }, p)
+        p
       );
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
