@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import {
   ChevronLeft,
   Dribbble,
@@ -17,7 +18,7 @@ function Footer({
   categories,
   onCategoryClick,
 }: {
-  onNavigate: (p: Page) => void;
+  onNavigate?: (p: Page) => void;
   categories: Category[];
   onCategoryClick?: (categoryId: string) => void;
 }) {
@@ -76,15 +77,13 @@ function Footer({
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <div
-              className="mb-3 cursor-pointer inline-flex items-center hover:opacity-85 transition-opacity"
-              onClick={() => {
-                onNavigate("home");
-                scrollToTop();
-              }}
+            <Link
+              to="/"
+              onClick={scrollToTop}
+              className="mb-3 inline-flex items-center hover:opacity-85 transition-opacity"
             >
               <LayeratLogo height={28} className="h-7 w-auto" />
-            </div>
+            </Link>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               {footerData.tagline}
             </p>
@@ -120,19 +119,16 @@ function Footer({
             <ul className="space-y-2.5">
               {categories.slice(0, 6).map((cat) => (
                 <li key={cat.id}>
-                  <button
+                  <Link
+                    to={`/browse?category=${encodeURIComponent(cat.slug || cat.id)}`}
                     onClick={() => {
-                      if (onCategoryClick) {
-                        onCategoryClick(cat.id);
-                      } else {
-                        onNavigate("browse");
-                      }
+                      if (onCategoryClick) onCategoryClick(cat.id);
                       scrollToTop();
                     }}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left cursor-pointer"
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {cat.name}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -145,21 +141,19 @@ function Footer({
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Browse All Resources", action: () => onNavigate("browse") },
-                { label: "Free UI Kits", action: () => onNavigate("browse") },
-                { label: "Design Systems", action: () => onNavigate("browse") },
-                { label: "Wireframe Kits", action: () => onNavigate("browse") },
-              ].map(({ label, action }) => (
+                { label: "Browse All Resources", to: "/browse" },
+                { label: "Free UI Kits", to: "/browse?category=ui-kits" },
+                { label: "Design Systems", to: "/browse?category=design-systems" },
+                { label: "Wireframe Kits", to: "/browse?category=wireframes" },
+              ].map(({ label, to }) => (
                 <li key={label}>
-                  <button
-                    onClick={() => {
-                      action();
-                      scrollToTop();
-                    }}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left cursor-pointer"
+                  <Link
+                    to={to}
+                    onClick={scrollToTop}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -172,22 +166,20 @@ function Footer({
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "About Us", page: "about" as Page },
-                { label: "Our Team", page: "team" as Page },
-                { label: "Become a Publisher", page: "publisher" as Page },
-                { label: "Terms of Service", page: "terms" as Page },
-                { label: "Privacy Policy", page: "privacy" as Page },
-              ].map(({ label, page }) => (
+                { label: "About Us", to: "/about" },
+                { label: "Our Team", to: "/team" },
+                { label: "Become a Publisher", to: "/publisher" },
+                { label: "Terms of Service", to: "/terms" },
+                { label: "Privacy Policy", to: "/privacy" },
+              ].map(({ label, to }) => (
                 <li key={label}>
-                  <button
-                    onClick={() => {
-                      onNavigate(page);
-                      scrollToTop();
-                    }}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left cursor-pointer"
+                  <Link
+                    to={to}
+                    onClick={scrollToTop}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -207,6 +199,7 @@ function Footer({
             <button
               onClick={scrollToTop}
               title="Back to top"
+              aria-label="Scroll back to top"
               className="w-9 h-9 rounded-xl border border-border bg-card flex items-center justify-center hover:border-primary/50 hover:bg-primary/10 transition-all duration-200 group cursor-pointer"
             >
               <ChevronLeft
