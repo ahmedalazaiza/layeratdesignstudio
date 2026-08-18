@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { LayeratLogo } from "../brand/LayeratLogo";
 import { supabase } from "../../lib/supabase";
+import { toast } from "sonner";
 import { sanitizeAuthInput } from "../../lib/cookieStorage";
 import type { AuthUser, Page } from "../../types";
 

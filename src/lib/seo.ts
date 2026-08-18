@@ -63,17 +63,21 @@ export function generateSEOMetadata(route: RouteState, product?: Product | null)
     case "product": {
       if (product) {
         const title = `${product.title} — Free Figma Download · ${SITE_NAME}`;
-        const description =
-          product.short_description ||
-          `Download ${product.title} 100% free for Figma. Includes ${product.screens_count || 0} screens, ${
-            product.components_count || 0
+        const pDesc =
+          product.shortDescription ||
+          (product as any).short_description ||
+          `Download ${product.title} 100% free for Figma. Includes ${
+            product.screensCount || (product as any).screens_count || 0
+          } screens, ${
+            product.componentsCount || (product as any).components_count || 0
           } components, auto layout, and dark mode.`;
         const productUrl = `${BASE_URL}/product/${product.slug || product.id}`;
-        const image = product.thumbnail_url || DEFAULT_IMAGE;
+        const image =
+          product.thumbnail || (product as any).thumbnail_url || DEFAULT_IMAGE;
 
         return {
           title,
-          description,
+          description: pDesc,
           url: productUrl,
           image,
           type: "product",
