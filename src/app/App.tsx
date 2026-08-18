@@ -14,6 +14,7 @@ import { useTheme } from "next-themes";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { DataProvider, useData } from "../context/DataContext";
 import { Navbar } from "../components/layout/Navbar";
+import { ScrollToTop } from "../components/layout/ScrollToTop";
 import { AuthModal } from "../components/auth/AuthModal";
 import { SetNewPasswordModal } from "../components/auth/SetNewPasswordModal";
 import { GiftPopup } from "../components/auth/GiftPopup";
@@ -334,6 +335,9 @@ function AppContent() {
         isLoading={initialLoading}
         message="Loading free Figma resources..."
       />
+
+      {/* Automatically Reset Scroll to Top on Navigation */}
+      <ScrollToTop />
 
       {/* Dynamic SEO Tags & Schema Synchronizer */}
       <RouteSEOTracker />
