@@ -16,6 +16,7 @@ import {
   Package,
   ArrowRight,
   Layers,
+  ShieldCheck,
 } from "lucide-react";
 import { UnverifiedEmailBanner } from "./UnverifiedEmailBanner";
 import { LayeratLogo } from "../brand/LayeratLogo";

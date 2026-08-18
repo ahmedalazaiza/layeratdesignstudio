@@ -70,9 +70,25 @@ class ErrorBoundary extends React.Component<
             <h2 style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "8px" }}>
               Something went wrong
             </h2>
-            <p style={{ color: "#8a9e8e", fontSize: "14px", marginBottom: "24px" }}>
+            <p style={{ color: "#8a9e8e", fontSize: "14px", marginBottom: "16px" }}>
               An error occurred while loading this view. You can reload the studio to restore your session.
             </p>
+            {this.state.error?.message && (
+              <pre style={{
+                textAlign: "left",
+                backgroundColor: "#060907",
+                border: "1px solid #1a261c",
+                padding: "12px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                color: "#ff6b6b",
+                overflowX: "auto",
+                marginBottom: "20px",
+                maxHeight: "120px"
+              }}>
+                {this.state.error.message}
+              </pre>
+            )}
             <button
               onClick={() => window.location.reload()}
               style={{
