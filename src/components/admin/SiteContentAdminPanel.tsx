@@ -20,6 +20,7 @@ import {
   Moon,
   Shield,
   Layers,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
