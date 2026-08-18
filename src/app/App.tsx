@@ -656,9 +656,17 @@ function AppContent() {
         <AuthModal
           mode={authModal.mode}
           onClose={closeAuthModal}
-          onSuccess={() => {
+          onSuccess={(user) => {
             closeAuthModal();
             refreshUserProfile();
+            const userEmail = (user?.email || "").toLowerCase().trim();
+            if (
+              user?.role === "admin" ||
+              userEmail === "ahmedazy.uxui@gmail.com" ||
+              userEmail === "admin@layerat.com"
+            ) {
+              handleNavigate("admin");
+            }
           }}
           onSwitchMode={setAuthModalMode}
           onNavigate={handleNavigate}

@@ -341,6 +341,18 @@ export function Navbar({
             )}
           </button>
 
+          {/* Quick Access Admin Console Button */}
+          {isAdmin && (
+            <button
+              onClick={() => onNavigate("admin")}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-bold font-mono hover:bg-primary/20 hover:border-primary transition-all duration-200 cursor-pointer shadow-sm"
+              title="Open Layerat Studio Dashboard"
+            >
+              <ShieldCheck size={14} className="text-primary" />
+              <span>Studio Console</span>
+            </button>
+          )}
+
           {/* Auth / User Profile */}
           {authUser ? (
             <div className="relative hidden md:block" ref={profileRef}>
