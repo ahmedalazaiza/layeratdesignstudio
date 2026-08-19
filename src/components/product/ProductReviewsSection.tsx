@@ -16,17 +16,17 @@ import type { AuthUser, ProductReview } from "../../types";
 
 interface ProductReviewsSectionProps {
   productId: string;
-  productTitle: string;
-  authUser: AuthUser | null;
-  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
+  productTitle?: string;
+  authUser?: any;
+  onAuthOpen?: (mode: "login" | "register" | "forgot_password") => void;
   onStatsUpdate?: (newAverage: number, count: number) => void;
 }
 
 export function ProductReviewsSection({
   productId,
-  productTitle,
+  productTitle = "Product",
   authUser,
-  onAuthOpen,
+  onAuthOpen = () => {},
   onStatsUpdate,
 }: ProductReviewsSectionProps) {
   const [reviews, setReviews] = useState<ProductReview[]>([]);

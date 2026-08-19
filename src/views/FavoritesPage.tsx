@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import type { Product, AuthUser, Category, Page } from "../types";
 
 interface FavoritesPageProps {
-  authUser?: AuthUser | null;
+  authUser?: any;
   onProductClick?: (p: Product) => void;
   onWishlistToggle?: (id: string) => void;
   onToggleWishlist?: (id: string) => void;

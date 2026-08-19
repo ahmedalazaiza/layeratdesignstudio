@@ -28,6 +28,7 @@ import { LayeratLogo } from "../brand/LayeratLogo";
 import { CategoryMegaMenu } from "./CategoryMegaMenu";
 import { NotificationCenter } from "./NotificationCenter";
 import type { Page, User, Category } from "@/types/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -91,16 +92,23 @@ export function Navbar({
   onToggle,
   page,
   onNavigate,
-  authUser = null,
-  onAuthOpen,
-  onLogout,
+  authUser: propAuthUser,
+  onAuthOpen: propOnAuthOpen,
+  onLogout: propOnLogout,
   onSearch,
-  wishlistCount = 0,
+  wishlistCount: propWishlistCount,
   categories = [],
   onCategoryClick,
   activeCategoryId = null,
   onVerificationSuccess,
 }: NavbarProps) {
+  const auth = useAuth();
+  const authUser = propAuthUser !== undefined ? propAuthUser : auth.authUser;
+  const onAuthOpen = propOnAuthOpen || auth.openAuthModal;
+  const onLogout = propOnLogout || auth.logout;
+  const wishlistCount =
+    propWishlistCount !== undefined ? propWishlistCount : auth.wishlist.length;
+
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme, resolvedTheme } = useTheme();

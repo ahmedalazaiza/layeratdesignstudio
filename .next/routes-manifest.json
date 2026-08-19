@@ -26,6 +26,22 @@
         "nxtPslug": "nxtPslug"
       },
       "namedRegex": "^/product/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/products/[id]",
+      "regex": "^/products/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/products/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/profile/[idOrUserName]",
+      "regex": "^/profile/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPidOrUserName": "nxtPidOrUserName"
+      },
+      "namedRegex": "^/profile/(?<nxtPidOrUserName>[^/]+?)(?:/)?$"
     }
   ],
   "staticRoutes": [
@@ -48,6 +64,12 @@
       "namedRegex": "^/about(?:/)?$"
     },
     {
+      "page": "/admin",
+      "regex": "^/admin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin(?:/)?$"
+    },
+    {
       "page": "/browse",
       "regex": "^/browse(?:/)?$",
       "routeKeys": {},
@@ -60,16 +82,64 @@
       "namedRegex": "^/favorites(?:/)?$"
     },
     {
+      "page": "/forgot-password",
+      "regex": "^/forgot\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/forgot\\-password(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
       "page": "/privacy",
       "regex": "^/privacy(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/privacy(?:/)?$"
     },
     {
+      "page": "/products",
+      "regex": "^/products(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/products(?:/)?$"
+    },
+    {
+      "page": "/profile",
+      "regex": "^/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile(?:/)?$"
+    },
+    {
       "page": "/publisher",
       "regex": "^/publisher(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/publisher(?:/)?$"
+    },
+    {
+      "page": "/publisher/dashboard",
+      "regex": "^/publisher/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/publisher/dashboard(?:/)?$"
+    },
+    {
+      "page": "/publisher/products/new",
+      "regex": "^/publisher/products/new(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/publisher/products/new(?:/)?$"
+    },
+    {
+      "page": "/publisher/upload",
+      "regex": "^/publisher/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/publisher/upload(?:/)?$"
+    },
+    {
+      "page": "/signup",
+      "regex": "^/signup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signup(?:/)?$"
     },
     {
       "page": "/team",

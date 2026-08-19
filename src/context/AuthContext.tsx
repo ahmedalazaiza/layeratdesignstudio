@@ -1,45 +1,94 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { supabase } from "../lib/supabase";
+"use client";
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authService } from "@/services/authService";
+import { userService } from "@/services/userService";
+import { getAccessToken, clearAuthTokens, setAuthTokens } from "@/lib/api-client";
 import { toast } from "sonner";
-import type { AuthUser } from "../types";
+import type { User, LoginPayload, RegisterPayload } from "@/types/api";
+
+export type AuthModalMode =
+  | "login"
+  | "register"
+  | "forgot_password"
+  | "verify_code"
+  | "reset_password";
 
 export interface AuthContextValue {
-  authUser: AuthUser | null;
-  loading: boolean;
+  authUser: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
   wishlist: string[];
   toggleWishlist: (productId: string) => Promise<void>;
+  
+  // Auth modal control
   authModal: {
     isOpen: boolean;
-    mode: "login" | "register" | "forgot_password";
+    mode: AuthModalMode;
   };
-  openAuthModal: (mode?: "login" | "register" | "forgot_password") => void;
+  openAuthModal: (mode?: AuthModalMode) => void;
   closeAuthModal: () => void;
-  setAuthModalMode: (mode: "login" | "register" | "forgot_password") => void;
-  signOut: () => Promise<void>;
-  refreshUserProfile: () => Promise<void>;
+  setAuthModalMode: (mode: AuthModalMode) => void;
+
+  // Email verification modal control
+  emailVerifyModal: {
+    isOpen: boolean;
+  };
+  openEmailVerifyModal: () => void;
+  closeEmailVerifyModal: () => void;
+
+  // Auth operations
+  login: (payload: LoginPayload) => Promise<{ user: User }>;
+  signup: (payload: RegisterPayload) => Promise<{ user: User }>;
+  googleLogin: (credential: string) => Promise<{ user: User; isNewUser?: boolean }>;
+  logout: () => void;
+  updateProfile: (payload: Partial<User>) => Promise<User>;
+  uploadAvatar: (file: File) => Promise<{ avatarUrl: string }>;
+  changePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
+  disconnectGoogle: () => Promise<void>;
+  requestEmailVerification: () => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  refetchUser: () => Promise<any>;
+  refreshUserProfile: () => Promise<any>;
+  signOut: () => void;
   showSetNewPasswordModal: boolean;
-  setShowSetNewPasswordModal: (show: boolean) => void;
+  setShowSetNewPasswordModal: (val: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const ADMIN_EMAILS = ["ahmedazy.uxui@gmail.com", "admin@layerat.com"];
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [tokenPresent, setTokenPresent] = useState<boolean>(false);
   const [wishlist, setWishlist] = useState<string[]>([]);
-  const [showSetNewPasswordModal, setShowSetNewPasswordModal] = useState(false);
 
+  // Track token existence in cookies on mount and storage events
+  useEffect(() => {
+    const token = getAccessToken();
+    setTokenPresent(Boolean(token));
+  }, []);
+
+  // Modal states
   const [authModal, setAuthModal] = useState<{
     isOpen: boolean;
-    mode: "login" | "register" | "forgot_password";
+    mode: AuthModalMode;
   }>({
     isOpen: false,
     mode: "login",
   });
 
-  const openAuthModal = useCallback((mode: "login" | "register" | "forgot_password" = "login") => {
+  const [emailVerifyModal, setEmailVerifyModal] = useState<{ isOpen: boolean }>({
+    isOpen: false,
+  });
+
+  const openAuthModal = useCallback((mode: AuthModalMode = "login") => {
     setAuthModal({ isOpen: true, mode });
   }, []);
 
@@ -47,212 +96,243 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthModal((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
-  const setAuthModalMode = useCallback((mode: "login" | "register" | "forgot_password") => {
+  const setAuthModalMode = useCallback((mode: AuthModalMode) => {
     setAuthModal((prev) => ({ ...prev, mode }));
   }, []);
 
-  // Sync profile from Supabase profiles table
-  const syncProfile = useCallback(async (sessionUser: any) => {
-    if (!sessionUser) {
-      setAuthUser(null);
-      return;
-    }
-
-    try {
-      const email = sessionUser.email || "";
-      const isConfiguredAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", sessionUser.id)
-        .single();
-
-      const userRole: "user" | "creator" | "admin" =
-        isConfiguredAdmin || profile?.role === "admin"
-          ? "admin"
-          : profile?.role === "creator"
-          ? "creator"
-          : "user";
-
-      const isVerified = Boolean(
-        sessionUser.email_confirmed_at ||
-        sessionUser.confirmed_at ||
-        sessionUser.app_metadata?.provider === "google" ||
-        profile?.is_verified ||
-        profile?.email_verified ||
-        isConfiguredAdmin
-      );
-
-      const user: AuthUser = {
-        id: sessionUser.id,
-        email,
-        name: profile?.name || sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || email.split("@")[0],
-        avatar: profile?.avatar_url || sessionUser.user_metadata?.avatar_url || undefined,
-        role: userRole,
-        provider: sessionUser.app_metadata?.provider || "email",
-        createdAt: profile?.created_at || sessionUser.created_at,
-        isVerified,
-        isEmailVerified: isVerified,
-      };
-
-      setAuthUser(user);
-
-      // Load user's wishlist (localStorage first for instant response + graceful DB sync)
-      try {
-        const localKey = `layerat_wishlist_${sessionUser.id}`;
-        let localWl: string[] = [];
-        try {
-          const saved = localStorage.getItem(localKey);
-          if (saved) localWl = JSON.parse(saved);
-        } catch {}
-
-        if (profile?.wishlist && Array.isArray(profile.wishlist)) {
-          localWl = Array.from(new Set([...localWl, ...profile.wishlist]));
-        }
-
-        setWishlist(localWl);
-
-        // Graceful DB check (only if table exists)
-        try {
-          const { data: wlData, error: wlError } = await supabase
-            .from("wishlists")
-            .select("product_id")
-            .eq("user_id", sessionUser.id);
-
-          if (!wlError && wlData && wlData.length > 0) {
-            const dbIds = wlData.map((w: any) => w.product_id);
-            const merged = Array.from(new Set([...localWl, ...dbIds]));
-            setWishlist(merged);
-            localStorage.setItem(localKey, JSON.stringify(merged));
-          }
-        } catch {}
-      } catch (err) {
-        console.warn("Profile sync notice:", err);
-      }
-    } catch (err) {
-      console.warn("Profile sync notice:", err);
-    }
+  const openEmailVerifyModal = useCallback(() => {
+    setEmailVerifyModal({ isOpen: true });
   }, []);
 
-  // Initialize auth session
+  const closeEmailVerifyModal = useCallback(() => {
+    setEmailVerifyModal({ isOpen: false });
+  }, []);
+
+  // ─── Query Current User ───
+  const {
+    data: authUser = null,
+    isLoading,
+    refetch: refetchUser,
+  } = useQuery<User | null>({
+    queryKey: ["authUser"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token) return null;
+      try {
+        const profile = await userService.getProfile();
+        return profile;
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          clearAuthTokens();
+          setTokenPresent(false);
+        }
+        return null;
+      }
+    },
+    enabled: tokenPresent,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false,
+  });
+
+  // Sync wishlist from user profile or localStorage
   useEffect(() => {
-    let mounted = true;
-
-    const initAuth = async () => {
+    if (authUser) {
+      const userWishlist = authUser.favoriteList || authUser.wishlist || [];
+      setWishlist(userWishlist);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted && session?.user) {
-          await syncProfile(session.user);
-        }
-      } catch (err) {
-        console.warn("Auth initialization notice:", err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Listen to Supabase auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setShowSetNewPasswordModal(true);
-      }
-
-      if (session?.user) {
-        await syncProfile(session.user);
-      } else {
-        setAuthUser(null);
-        setWishlist([]);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      authListener?.subscription?.unsubscribe();
-    };
-  }, [syncProfile]);
-
-  // Toggle wishlist item
-  const toggleWishlist = useCallback(async (productId: string) => {
-    if (!authUser) {
-      openAuthModal("login");
-      toast.info("Please sign in to save items to your wishlist", {
-        description: "Your saved collection will sync across all your devices.",
-      });
-      return;
-    }
-
-    const exists = wishlist.includes(productId);
-    const updated = exists
-      ? wishlist.filter((id) => id !== productId)
-      : [...wishlist, productId];
-
-    setWishlist(updated);
-
-    // Save to localStorage immediately
-    try {
-      localStorage.setItem(`layerat_wishlist_${authUser.id}`, JSON.stringify(updated));
-    } catch {}
-
-    if (exists) {
-      toast.success("Removed from wishlist");
+        const key = `layerat_wishlist_${authUser._id || authUser.id}`;
+        localStorage.setItem(key, JSON.stringify(userWishlist));
+      } catch {}
     } else {
-      toast.success("Added to your wishlist", {
-        description: "View all your saved UI kits in the Favorites tab.",
-      });
+      try {
+        const guestWl = localStorage.getItem("layerat_guest_wishlist");
+        if (guestWl) setWishlist(JSON.parse(guestWl));
+      } catch {}
     }
+  }, [authUser]);
 
-    // Attempt DB sync in background
-    try {
-      if (exists) {
-        await supabase
-          .from("wishlists")
-          .delete()
-          .eq("user_id", authUser.id)
-          .eq("product_id", productId);
+  // ─── Login Mutation ───
+  const loginMutation = useMutation({
+    mutationFn: (payload: LoginPayload) => authService.login(payload),
+    onSuccess: (data) => {
+      setTokenPresent(true);
+      queryClient.setQueryData(["authUser"], data.user);
+      closeAuthModal();
+      toast.success(`Welcome back, ${data.user.displayName || data.user.userName}!`);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || "Invalid credentials";
+      toast.error(msg);
+    },
+  });
+
+  // ─── Signup Mutation ───
+  const signupMutation = useMutation({
+    mutationFn: (payload: RegisterPayload) => authService.signup(payload),
+    onSuccess: (data) => {
+      setTokenPresent(true);
+      queryClient.setQueryData(["authUser"], data.user);
+      closeAuthModal();
+      toast.success(`Account created successfully! Welcome to Layerat Studio.`);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || "Failed to create account";
+      toast.error(msg);
+    },
+  });
+
+  // ─── Google OAuth Mutation ───
+  const googleLoginMutation = useMutation({
+    mutationFn: (credential: string) => authService.googleLogin(credential),
+    onSuccess: (data) => {
+      setTokenPresent(true);
+      queryClient.setQueryData(["authUser"], data.user);
+      closeAuthModal();
+      if (data.isNewUser) {
+        toast.success(`Welcome to Layerat Studio, ${data.user.displayName || data.user.userName}!`);
       } else {
-        await supabase
-          .from("wishlists")
-          .insert({ user_id: authUser.id, product_id: productId });
+        toast.success(`Signed in with Google as ${data.user.displayName || data.user.email}!`);
       }
-    } catch {}
-  }, [authUser, wishlist, openAuthModal]);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || "Google sign-in failed";
+      toast.error(msg);
+    },
+  });
 
-  const signOut = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-      setAuthUser(null);
-      setWishlist([]);
-      toast.success("Signed out successfully");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to sign out");
-    }
+  // ─── Logout ───
+  const logout = useCallback(() => {
+    authService.logout();
+    setTokenPresent(false);
+    queryClient.setQueryData(["authUser"], null);
+    queryClient.removeQueries({ queryKey: ["authUser"] });
+    toast.success("Signed out successfully");
+  }, [queryClient]);
+
+  // ─── Update Profile Mutation ───
+  const updateProfileMutation = useMutation({
+    mutationFn: (payload: Partial<User>) => userService.updateProfile(payload),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["authUser"], (old: User | null) => ({
+        ...old,
+        ...updatedUser,
+      }));
+      toast.success("Profile updated successfully!");
+    },
+  });
+
+  // ─── Avatar Upload Mutation ───
+  const avatarUploadMutation = useMutation({
+    mutationFn: (file: File) => userService.uploadAvatar(file),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["authUser"], (old: User | null) => {
+        if (!old) return old;
+        return {
+          ...old,
+          avatar: data.avatarUrl,
+        };
+      });
+      toast.success("Avatar updated successfully!");
+    },
+  });
+
+  // ─── Change Password ───
+  const changePassword = useCallback(
+    async (payload: { currentPassword: string; newPassword: string }) => {
+      await authService.changePassword(payload);
+      toast.success("Password changed successfully!");
+    },
+    []
+  );
+
+  // ─── Disconnect Google ───
+  const disconnectGoogle = useCallback(async () => {
+    await authService.disconnectGoogle();
+    await refetchUser();
+    toast.success("Google account disconnected.");
+  }, [refetchUser]);
+
+  // ─── Email Verification ───
+  const requestEmailVerification = useCallback(async () => {
+    await userService.requestEmailVerification();
+    toast.success("Verification code sent to your email!");
   }, []);
 
-  const refreshUserProfile = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await syncProfile(session.user);
-    }
-  }, [syncProfile]);
+  const verifyEmail = useCallback(
+    async (code: string) => {
+      const data = await userService.verifyEmailCode(code);
+      if (data.user) {
+        queryClient.setQueryData(["authUser"], data.user);
+      } else {
+        await refetchUser();
+      }
+      closeEmailVerifyModal();
+      toast.success("Email verified successfully!");
+    },
+    [queryClient, refetchUser, closeEmailVerifyModal]
+  );
+
+  // ─── Wishlist Toggle ───
+  const toggleWishlist = useCallback(
+    async (productId: string) => {
+      if (!tokenPresent || !authUser) {
+        openAuthModal("login");
+        toast.info("Please sign in to save items to your studio library.");
+        return;
+      }
+
+      const exists = wishlist.includes(productId);
+      const updated = exists
+        ? wishlist.filter((id) => id !== productId)
+        : [...wishlist, productId];
+
+      setWishlist(updated);
+
+      // Save to localStorage
+      try {
+        const key = `layerat_wishlist_${authUser._id || authUser.id}`;
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch {}
+
+      if (exists) {
+        toast.success("Removed from wishlist");
+      } else {
+        toast.success("Saved to your studio wishlist!");
+      }
+    },
+    [tokenPresent, authUser, wishlist, openAuthModal]
+  );
 
   return (
     <AuthContext.Provider
       value={{
         authUser,
-        loading,
+        isLoading,
+        isAuthenticated: Boolean(tokenPresent && authUser),
         wishlist,
         toggleWishlist,
         authModal,
         openAuthModal,
         closeAuthModal,
         setAuthModalMode,
-        signOut,
-        refreshUserProfile,
-        showSetNewPasswordModal,
-        setShowSetNewPasswordModal,
+        emailVerifyModal,
+        openEmailVerifyModal,
+        closeEmailVerifyModal,
+        login: (payload) => loginMutation.mutateAsync(payload),
+        signup: (payload) => signupMutation.mutateAsync(payload),
+        googleLogin: (credential) => googleLoginMutation.mutateAsync(credential),
+        logout,
+        updateProfile: (payload) => updateProfileMutation.mutateAsync(payload),
+        uploadAvatar: (file) => avatarUploadMutation.mutateAsync(file),
+        changePassword,
+        disconnectGoogle,
+        requestEmailVerification,
+        verifyEmail,
+        refetchUser,
+        refreshUserProfile: refetchUser,
+        signOut: logout,
+        showSetNewPasswordModal: false,
+        setShowSetNewPasswordModal: () => {},
       }}
     >
       {children}

@@ -56,6 +56,7 @@ interface LogoProps {
   className?: string;
   iconOnly?: boolean;
   height?: number | string;
+  size?: "sm" | "md" | "lg" | number | string;
   alt?: string;
 }
 
@@ -180,10 +181,22 @@ export function LayeratLogo({
   isDark,
   className = "",
   iconOnly = false,
-  height = 32,
+  height,
+  size = "md",
   alt = "Layerat Design Studio",
 }: LogoProps) {
   const brand = useBrandLogos();
+
+  const resolvedHeight =
+    height !== undefined
+      ? height
+      : size === "sm"
+      ? 24
+      : size === "lg"
+      ? 42
+      : size === "md"
+      ? 32
+      : size;
 
   const resolvedIsDark =
     typeof isDark === "boolean"
@@ -198,7 +211,7 @@ export function LayeratLogo({
         <img
           src={customIcon}
           alt={alt}
-          style={{ height }}
+          style={{ height: resolvedHeight }}
           className={`object-contain ${className}`}
         />
       );
@@ -207,7 +220,7 @@ export function LayeratLogo({
     return (
       <LayeratIconSvg
         isDark={isDark}
-        size={height}
+        size={resolvedHeight}
         className={className}
       />
     );
@@ -219,7 +232,7 @@ export function LayeratLogo({
       <img
         src={customLogo}
         alt={alt}
-        style={{ height }}
+        style={{ height: resolvedHeight }}
         className={`object-contain ${className}`}
       />
     );
@@ -228,7 +241,7 @@ export function LayeratLogo({
   return (
     <LayeratLogoSvg
       isDark={isDark}
-      height={height}
+      height={resolvedHeight}
       className={className}
     />
   );

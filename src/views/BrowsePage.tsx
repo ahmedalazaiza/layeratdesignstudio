@@ -1,634 +1,539 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, X, Check, ChevronDown, Sparkles } from "lucide-react";
-import { ProductCard } from "../components/product/ProductCard";
-import { CustomSelect } from "../components/ui/CustomSelect";
-import { Footer } from "../components/layout/Footer";
-import type { Product, Category, AuthUser, BrowseFilters, Page } from "../types";
+"use client";
 
-interface BrowsePageProps {
-  initialFilters?: Partial<BrowseFilters>;
-  onProductClick?: (p: Product) => void;
-  authUser?: AuthUser | null;
-  onWishlistToggle?: (id: string) => void;
-  onToggleWishlist?: (id: string) => void;
-  onAuthOpen?: (mode: "login" | "register" | "forgot_password") => void;
-  categories?: Category[];
-  products?: Product[];
-  onNavigate?: (p: Page) => void;
-  wishlist?: string[];
-  activeCategoryId?: string | null;
-  activeSubcategoryId?: string | null;
-  onCategoryChange?: (catId: string | null) => void;
-  onSubcategoryChange?: (subcatId: string | null) => void;
-  initialSearchQuery?: string;
-}
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search,
+  Filter,
+  X,
+  Check,
+  ChevronDown,
+  Sparkles,
+  Layers,
+  ArrowUpDown,
+  Tag as TagIcon,
+  RefreshCw,
+  SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+} from "lucide-react";
+import { ProductCard } from "@/components/product/ProductCard";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { categoryService } from "@/services/categoryService";
+import { productService } from "@/services/productService";
+import { useProductFilters } from "@/hooks/useProductFilters";
+import { useAuth } from "@/hooks/useAuth";
+import type { Product, Category, Tag, Page } from "@/types/api";
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest Arrivals" },
+  { value: "popular", label: "Most Popular" },
+  { value: "downloads", label: "Top Downloads" },
+  { value: "rating", label: "Highest Rated" },
+  { value: "price_asc", label: "Price: Low to High" },
+  { value: "price_desc", label: "Price: High to Low" },
+];
 
 export function BrowsePage({
-  initialFilters,
-  onProductClick = () => {},
-  authUser = null,
-  onWishlistToggle,
-  onToggleWishlist,
-  onAuthOpen = () => {},
-  categories = [],
-  products = [],
-  onNavigate = () => {},
-  wishlist = [],
-  activeCategoryId,
-  activeSubcategoryId,
-  onCategoryChange,
-  onSubcategoryChange,
-  initialSearchQuery,
-}: BrowsePageProps) {
-  const handleWishlist = onToggleWishlist || onWishlistToggle || (() => {});
+  onProductClick,
+  onNavigate,
+}: {
+  onProductClick?: (p: Product) => void;
+  onNavigate?: (page: Page) => void;
+}) {
+  const router = useRouter();
+  const { authUser, toggleWishlist, wishlist, openAuthModal } = useAuth();
+  const {
+    query,
+    category,
+    subCategory,
+    tag,
+    sort,
+    page,
+    setQuery,
+    setCategory,
+    setSubCategory,
+    setTag,
+    setSort,
+    setPage,
+    resetAllFilters,
+    hasActiveFilters,
+  } = useProductFilters();
 
-  const [filters, setFilters] = useState<BrowseFilters>({
-    query: initialSearchQuery ?? initialFilters?.query ?? "",
-    categoryId: activeCategoryId ?? initialFilters?.categoryId ?? null,
-    subcategoryId: activeSubcategoryId ?? initialFilters?.subcategoryId ?? null,
-    isFree: null,
-    sortBy: "newest",
+  const [searchInput, setSearchInput] = useState(query || "");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync internal search input with URL query state
+  useEffect(() => {
+    setSearchInput(query || "");
+  }, [query]);
+
+  // Debounced search handler
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setQuery(val.trim());
+    }, 350);
+  };
+
+  // 1. Fetch Categories & Subcategories
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: () => categoryService.getCategories(),
+    staleTime: 5 * 60 * 1000,
   });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedCats, setExpandedCats] = useState<string[]>([]);
 
-  // Synchronize when parent updates activeCategoryId or initialSearchQuery or activeSubcategoryId
+  // 2. Fetch Tags
+  const { data: tags = [], isLoading: tagsLoading } = useQuery<Tag[]>({
+    queryKey: ["tags"],
+    queryFn: () => categoryService.getTags(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 3. Fetch Filtered Products
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    isPlaceholderData,
+  } = useQuery({
+    queryKey: ["products", query, category, subCategory, tag, sort, page],
+    queryFn: () =>
+      productService.getProducts({
+        query: query || undefined,
+        category: category || undefined,
+        subCategory: subCategory || undefined,
+        tag: tag || undefined,
+        sort: sort || "newest",
+        page: page || 1,
+        limit: 20,
+      }),
+    placeholderData: (previousData) => previousData,
+    staleTime: 60 * 1000,
+  });
+
+  const products = productsData?.products || [];
+  const meta = productsData?.meta;
+  const totalPages = meta?.totalPages || 1;
+
+  // Auto-expand category in sidebar when selected
   useEffect(() => {
-    if (activeCategoryId !== undefined) {
-      setFilters((f) => ({ ...f, categoryId: activeCategoryId }));
-      if (activeCategoryId) {
-        setExpandedCats((prev) =>
-          prev.includes(activeCategoryId) ? prev : [...prev, activeCategoryId]
-        );
-      }
+    if (category) {
+      setExpandedCategories((prev) => (prev.includes(category) ? prev : [...prev, category]));
     }
-  }, [activeCategoryId]);
+  }, [category]);
 
-  useEffect(() => {
-    if (activeSubcategoryId !== undefined) {
-      setFilters((f) => ({ ...f, subcategoryId: activeSubcategoryId }));
-    }
-  }, [activeSubcategoryId]);
-
-  useEffect(() => {
-    if (initialSearchQuery !== undefined) {
-      setFilters((f) => ({ ...f, query: initialSearchQuery }));
-    }
-  }, [initialSearchQuery]);
-
-  useEffect(() => {
-    if (initialFilters) {
-      setFilters((f) => ({ ...f, ...initialFilters }));
-      if (initialFilters.categoryId) {
-        setExpandedCats((prev) =>
-          prev.includes(initialFilters.categoryId!)
-            ? prev
-            : [...prev, initialFilters.categoryId!]
-        );
-      }
-    }
-  }, [initialFilters]);
-
-  const toggleCatExpand = (catId: string) => {
-    setExpandedCats((e) =>
-      e.includes(catId) ? e.filter((c) => c !== catId) : [...e, catId]
+  const toggleCategoryExpand = (catId: string) => {
+    setExpandedCategories((prev) =>
+      prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId]
     );
   };
 
-  const handleSelectCategory = (catId: string | null) => {
-    setFilters((f) => ({ ...f, categoryId: catId, subcategoryId: null }));
-    if (onCategoryChange) {
-      onCategoryChange(catId);
+  const handleProductSelect = (p: Product) => {
+    if (onProductClick) {
+      onProductClick(p);
+    } else {
+      router.push(`/product/${p.slug || p.id || p._id}`);
     }
   };
 
-  // Filter and sort products
-  const filtered = useMemo(() => {
-    return products
-      .filter((p) => {
-        if (filters.categoryId && p.categoryId !== filters.categoryId)
-          return false;
-        if (filters.subcategoryId && p.subcategoryId !== filters.subcategoryId)
-          return false;
-        if (filters.query) {
-          const q = filters.query.toLowerCase().trim();
-          return (
-            p.title.toLowerCase().includes(q) ||
-            (p.shortDescription || p.overview || "").toLowerCase().includes(q) ||
-            (p.tags &&
-              p.tags.some((t) =>
-                (typeof t === "string" ? t : t.name || t.slug || "")
-                  .toLowerCase()
-                  .includes(q)
-              ))
-          );
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        if (filters.sortBy === "downloads")
-          return (b.downloadsCount || b.downloads || 0) - (a.downloadsCount || a.downloads || 0);
-        if (filters.sortBy === "rating") return (b.rating || 0) - (a.rating || 0);
-        if (filters.sortBy === "alphabetical")
-          return a.title.localeCompare(b.title);
-        // Default newest
-        return (
-          new Date(b.createdAt || 0).getTime() -
-          new Date(a.createdAt || 0).getTime()
-        );
-      });
-  }, [products, filters]);
-
-  const activeCat = categories.find((c) => c.id === filters.categoryId);
-
-  const sortOptions = [
-    { value: "newest", label: "Newest First" },
-    { value: "downloads", label: "Most Downloaded" },
-    { value: "rating", label: "Highest Rated" },
-    { value: "alphabetical", label: "Alphabetical (A-Z)" },
-  ];
-
   return (
-    <motion.main
-      key="browse"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      className="min-h-screen pt-20 lg:pt-24"
-    >
-      <div className="max-w-7xl mx-auto px-4 lg:px-10 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-8 pb-8 border-b border-border">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-mono font-medium mb-3">
-              <Sparkles size={12} />
-              100% Free Library
-            </div>
-            <h1 className="text-3xl lg:text-5xl font-display font-extrabold text-foreground">
-              {activeCat ? activeCat.name : "All Design Resources"}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-2 max-w-xl leading-relaxed">
-              {activeCat
-                ? `Explore our collection of free ${activeCat.name.toLowerCase()} for Figma.`
-                : "Explore our complete curated catalog of Figma UI kits, design systems, wireframe kits, and templates."}
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-            {/* Mobile quick search */}
-            <div className="relative lg:hidden w-full">
-              <Search
-                size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                value={filters.query}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, query: e.target.value }))
-                }
-                placeholder="Search free resources..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-
-            <div className="flex items-center gap-3 justify-between sm:justify-end">
-              {/* Mobile filter toggle */}
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-sm font-medium text-foreground hover:border-primary/40 transition-colors cursor-pointer"
-              >
-                <Filter size={15} /> <span>Filters</span>
-              </button>
-
-              {/* Custom Sort Select */}
-              <div className="w-44 sm:w-48">
-                <CustomSelect
-                  options={sortOptions}
-                  value={filters.sortBy}
-                  onChange={(val) =>
-                    setFilters((f) => ({
-                      ...f,
-                      sortBy: val as BrowseFilters["sortBy"],
-                    }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Horizontal Quick-Category Chips (Touch-friendly scroll) */}
-        <div className="lg:hidden flex overflow-x-auto no-scrollbar gap-2 mb-6 pb-2 -mx-4 px-4">
-          <button
-            onClick={() => handleSelectCategory(null)}
-            className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap ${
-              filters.categoryId === null
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-card text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All Resources ({products.length})
-          </button>
-          {categories.map((cat, idx) => {
-            const catId = cat.id || cat._id || "";
-            const isSelected = filters.categoryId === catId;
-            const count = products.filter((p) => (p.categoryId || (p as any).category) === catId).length;
-            return (
-              <button
-                key={catId || idx}
-                onClick={() => handleSelectCategory(catId)}
-                className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap ${
-                  isSelected
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "border border-border bg-card text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {cat.name} ({count})
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Main layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-          {/* Desktop Sidebar */}
-          <aside className="hidden lg:block space-y-6 sticky top-28 bg-card border border-border rounded-3xl p-6 shadow-sm">
-            {/* Search */}
+    <div className="min-h-screen bg-background pb-20">
+      {/* Top Hero Banner */}
+      <div className="border-b border-border/70 bg-card/40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2 font-medium">
-                Search
-              </label>
-              <div className="relative">
-                <Search
-                  size={15}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  value={filters.query}
-                  onChange={(e) =>
-                    setFilters((f) => ({ ...f, query: e.target.value }))
-                  }
-                  placeholder="Search UI kits, icons..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
-                />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono font-bold mb-3">
+                <Sparkles size={11} />
+                <span>100% Free Lifetime Downloads</span>
               </div>
-            </div>
-
-            {/* Category list */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide font-medium">
-                  Categories
-                </label>
-                {filters.categoryId && (
-                  <button
-                    onClick={() => handleSelectCategory(null)}
-                    className="text-xs text-primary hover:underline font-mono"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                {/* All */}
-                <button
-                  onClick={() => handleSelectCategory(null)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
-                    filters.categoryId === null
-                      ? "bg-primary/10 text-primary font-bold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                  }`}
-                >
-                  <span>All Resources</span>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {products.length}
-                  </span>
-                </button>
-
-                {/* Categories */}
-                {categories.map((cat, idx) => {
-                  const catId = cat.id || cat._id || "";
-                  const isSelected = filters.categoryId === catId;
-                  const isExpanded = expandedCats.includes(catId);
-                  const count = products.filter(
-                    (p) => (p.categoryId || (p as any).category) === catId
-                  ).length;
-
-                  return (
-                    <div key={catId || idx}>
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => handleSelectCategory(catId)}
-                          className={`flex-1 flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors text-left cursor-pointer ${
-                            isSelected
-                              ? "bg-primary/10 text-primary font-bold"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                          }`}
-                        >
-                          <span className="truncate">{cat.name}</span>
-                          <span className="text-xs font-mono text-muted-foreground ml-2">
-                            {count}
-                          </span>
-                        </button>
-                        {cat.subcategories && cat.subcategories.length > 0 && (
-                          <button
-                            onClick={() => toggleCatExpand(catId)}
-                            className="p-2 text-muted-foreground hover:text-foreground rounded-lg cursor-pointer"
-                          >
-                            <ChevronDown
-                              size={14}
-                              className={`transition-transform duration-200 ${
-                                isExpanded ? "rotate-180 text-primary" : ""
-                              }`}
-                            />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Subcategories */}
-                      <AnimatePresence>
-                        {isExpanded && cat.subcategories && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden pl-4 pr-1 py-1 space-y-0.5 border-l border-border/60 ml-3 my-1"
-                          >
-                            {cat.subcategories.map((sub, sIdx) => {
-                              const subId = sub.id || (sub as any)._id || sub.slug || "";
-                              const subCount = products.filter(
-                                (p) => (p.subcategoryId || (p as any).subCategory) === subId
-                              ).length;
-                              const isSubSelected =
-                                filters.subcategoryId === subId;
-
-                              return (
-                                <button
-                                  key={subId || sIdx}
-                                  onClick={() => {
-                                    handleSelectCategory(catId);
-                                    setFilters((f) => ({
-                                      ...f,
-                                      subcategoryId: isSubSelected
-                                        ? null
-                                        : subId,
-                                    }));
-                                  }}
-                                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer ${
-                                    isSubSelected
-                                      ? "text-primary font-bold bg-primary/10"
-                                      : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                                  }`}
-                                >
-                                  <span className="truncate">{sub.name}</span>
-                                  <span className="text-[10px] font-mono text-muted-foreground ml-2">
-                                    {subCount}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* License info box */}
-            <div className="rounded-2xl p-4 bg-muted/40 border border-border text-xs space-y-2">
-              <div className="flex items-center gap-1.5 text-foreground font-semibold">
-                <Check size={14} className="text-primary" /> Free Commercial License
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                All downloaded resources can be freely used in personal, client, and commercial projects with no attribution required.
+              <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground">
+                Figma Resources & UI Kits
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+                Explore production-ready design systems, mobile screens, SaaS dashboards, and wireframe kits.
               </p>
             </div>
-          </aside>
 
-          {/* Product grid */}
-          <div className="lg:col-span-3">
-            {/* Active filters pill list */}
-            {(filters.query || filters.categoryId || filters.subcategoryId) && (
-              <div className="flex flex-wrap items-center gap-2 mb-6">
-                <span className="text-xs text-muted-foreground font-mono">
-                  Active Filters:
-                </span>
-                {filters.query && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
-                    Search: "{filters.query}"
-                    <button
-                      onClick={() => setFilters((f) => ({ ...f, query: "" }))}
-                      className="hover:text-foreground cursor-pointer"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                )}
-                {filters.categoryId && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
-                    Category: {categories.find((c) => c.id === filters.categoryId)?.name}
-                    <button
-                      onClick={() => handleSelectCategory(null)}
-                      className="hover:text-foreground cursor-pointer"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                )}
-                {filters.subcategoryId && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
-                    Subcategory: {filters.subcategoryId}
-                    <button
-                      onClick={() =>
-                        setFilters((f) => ({ ...f, subcategoryId: null }))
-                      }
-                      className="hover:text-foreground cursor-pointer"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                )}
+            {/* Search Input Bar */}
+            <div className="w-full md:w-80 lg:w-96 relative">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search UI kits, design systems..."
+                className="w-full pl-11 pr-10 py-3.5 rounded-2xl border border-border bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all text-sm shadow-sm"
+              />
+              <Search
+                size={17}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none"
+              />
+              {searchInput && (
                 <button
+                  type="button"
                   onClick={() => {
-                    handleSelectCategory(null);
-                    setFilters({
-                      query: "",
-                      categoryId: null,
-                      subcategoryId: null,
-                      isFree: null,
-                      sortBy: "newest",
-                    });
+                    setSearchInput("");
+                    setQuery("");
                   }}
-                  className="text-xs text-muted-foreground hover:text-foreground hover:underline font-mono ml-2 cursor-pointer"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
                 >
-                  Reset all
+                  <X size={14} />
                 </button>
-              </div>
-            )}
-
-            {filtered.length === 0 ? (
-              <div className="text-center py-24 rounded-3xl border border-border bg-card p-8">
-                <Search size={40} className="mx-auto mb-4 text-muted-foreground/40" />
-                <h3 className="text-xl font-display font-bold text-foreground mb-2">
-                  No resources found
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                  Try adjusting your search keywords or removing selected category filters.
-                </p>
-                <button
-                  onClick={() => {
-                    handleSelectCategory(null);
-                    setFilters({
-                      query: "",
-                      categoryId: null,
-                      subcategoryId: null,
-                      isFree: null,
-                      sortBy: "newest",
-                    });
-                  }}
-                  className="px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filtered.map((prod, idx) => {
-                  const prodId = prod.id || prod._id || "";
-                  return (
-                    <ProductCard
-                      key={prodId || idx}
-                      product={prod}
-                      onProductClick={onProductClick}
-                      authUser={authUser}
-                      onWishlistToggle={handleWishlist}
-                      onAuthOpen={onAuthOpen}
-                      categories={categories}
-                      wishlist={wishlist}
-                      isWishlisted={
-                        wishlist
-                          ? wishlist.includes(prodId)
-                          : Boolean(authUser?.wishlist?.includes(prodId))
-                      }
-                    />
-                  );
-                })}
-              </div>
-            )}
+              )}
+            </div>
           </div>
+
+          {/* Horizontal Tag Pills */}
+          {tags.length > 0 && (
+            <div className="flex items-center gap-2 mt-6 overflow-x-auto pb-2 scrollbar-none">
+              <span className="text-xs font-mono uppercase text-muted-foreground/70 tracking-wide shrink-0 mr-1 flex items-center gap-1">
+                <TagIcon size={12} /> Tags:
+              </span>
+
+              {tags.map((t) => {
+                const tagIdentifier = t.slug || t.name;
+                const isSelected = tag === tagIdentifier;
+                return (
+                  <button
+                    key={t._id || t.id || tagIdentifier}
+                    type="button"
+                    onClick={() => setTag(tagIdentifier)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-mono transition-all shrink-0 cursor-pointer ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground font-bold shadow-sm"
+                        : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border border-border hover:border-primary/40"
+                    }`}
+                  >
+                    #{t.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile filter drawer */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] lg:hidden bg-black/60 backdrop-blur-sm flex justify-end"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setSidebarOpen(false);
-            }}
-          >
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="w-full max-w-xs bg-card border-l border-border h-full p-6 overflow-y-auto space-y-6"
+      {/* Main Catalog Layout */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="flex items-center justify-between gap-4 mb-6">
+          {/* Active Filter Badges & Count */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-mono text-muted-foreground">
+              Showing <strong className="text-foreground">{products.length}</strong> resources
+            </span>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors cursor-pointer"
+              >
+                <X size={11} />
+                Reset Filters
+              </button>
+            )}
+          </div>
+
+          {/* Mobile Filter Toggle & Sort Dropdown */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+              className="lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border border-border bg-card text-foreground text-xs font-semibold cursor-pointer shadow-sm"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-border">
-                <h3 className="text-lg font-display font-bold text-foreground">
-                  Filters
-                </h3>
+              <SlidersHorizontal size={14} className="text-primary" />
+              <span>Categories</span>
+            </button>
+
+            <div className="w-44 sm:w-48">
+              <CustomSelect
+                value={sort}
+                onChange={(val) => setSort(val)}
+                options={SORT_OPTIONS}
+                placeholder="Sort by"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+          {/* ── Desktop Category Sidebar ── */}
+          <aside className="hidden lg:block lg:col-span-1 rounded-3xl border border-border bg-card p-5 shadow-sm sticky top-24">
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-border">
+              <h3 className="text-sm font-display font-bold text-foreground flex items-center gap-2">
+                <Layers size={16} className="text-primary" />
+                Categories
+              </h3>
+              {category && (
                 <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-1 rounded-lg hover:bg-muted text-muted-foreground"
+                  type="button"
+                  onClick={() => setCategory("")}
+                  className="text-[11px] font-mono text-muted-foreground hover:text-primary cursor-pointer"
                 >
-                  <X size={18} />
+                  Clear
                 </button>
-              </div>
+              )}
+            </div>
 
-              {/* Mobile search */}
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2 font-medium">
-                  Search
-                </label>
-                <div className="relative">
-                  <Search
-                    size={15}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <input
-                    value={filters.query}
-                    onChange={(e) =>
-                      setFilters((f) => ({ ...f, query: e.target.value }))
-                    }
-                    placeholder="Search resources..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-              </div>
+            <div className="space-y-1">
+              {/* "All Resources" option */}
+              <button
+                type="button"
+                onClick={() => setCategory("")}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-2xl text-xs font-semibold transition-colors text-left cursor-pointer ${
+                  !category
+                    ? "bg-primary/10 text-primary font-bold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <span>All Categories</span>
+                {!category && <Check size={14} className="text-primary" />}
+              </button>
 
-              {/* Mobile categories */}
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2 font-medium">
-                  Categories
-                </label>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => {
-                      handleSelectCategory(null);
-                      setSidebarOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors ${
-                      filters.categoryId === null
-                        ? "bg-primary/10 text-primary font-bold"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    All Resources
-                  </button>
-                  {categories.map((cat, idx) => {
-                    const catId = cat.id || cat._id || "";
-                    return (
+              {/* Categorized Trees */}
+              {categories.map((cat) => {
+                const catId = cat.slug || cat._id || cat.id || "";
+                const isSelected = category === catId || category === cat.slug || category === cat._id;
+                const isExpanded = expandedCategories.includes(catId);
+                const hasSubs = cat.subcategories && cat.subcategories.length > 0;
+
+                return (
+                  <div key={catId} className="space-y-0.5">
+                    <div
+                      className={`flex items-center justify-between px-3 py-2 rounded-2xl text-xs transition-colors cursor-pointer ${
+                        isSelected
+                          ? "bg-primary/10 text-primary font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                    >
                       <button
-                        key={catId || idx}
+                        type="button"
+                        onClick={() => setCategory(cat.slug || catId)}
+                        className="flex-1 text-left truncate"
+                      >
+                        {cat.name}
+                      </button>
+
+                      {hasSubs && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCategoryExpand(catId);
+                          }}
+                          className="p-1 text-muted-foreground/60 hover:text-foreground cursor-pointer"
+                        >
+                          <ChevronDown
+                            size={14}
+                            className={`transition-transform duration-200 ${
+                              isExpanded ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Subcategories */}
+                    <AnimatePresence>
+                      {hasSubs && isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.18 }}
+                          className="pl-4 space-y-0.5 overflow-hidden border-l border-border/60 ml-3"
+                        >
+                          {cat.subcategories!.map((sub) => {
+                            const subId = sub.slug || sub._id || sub.id || "";
+                            const isSubSelected = subCategory === subId || subCategory === sub.slug;
+
+                            return (
+                              <button
+                                key={subId}
+                                type="button"
+                                onClick={() => {
+                                  if (!isSelected) setCategory(cat.slug || catId);
+                                  setSubCategory(isSubSelected ? "" : sub.slug || subId);
+                                }}
+                                className={`w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-mono transition-colors flex items-center justify-between cursor-pointer ${
+                                  isSubSelected
+                                    ? "bg-primary/15 text-primary font-bold"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                                }`}
+                              >
+                                <span className="truncate">{sub.name}</span>
+                                {isSubSelected && <Check size={12} className="text-primary" />}
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+
+          {/* ── Mobile Sidebar Modal ── */}
+          <AnimatePresence>
+            {mobileSidebarOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 lg:hidden bg-black/60 backdrop-blur-sm p-4 flex items-end justify-center"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setMobileSidebarOpen(false);
+                }}
+              >
+                <motion.div
+                  initial={{ y: 100 }}
+                  animate={{ y: 0 }}
+                  exit={{ y: 100 }}
+                  className="w-full max-w-lg bg-card border border-border rounded-3xl p-6 max-h-[80vh] overflow-y-auto"
+                >
+                  <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
+                    <h3 className="text-base font-display font-bold text-foreground">
+                      Filter Categories
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setMobileSidebarOpen(false)}
+                      className="p-1 rounded-full text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategory("");
+                        setMobileSidebarOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 rounded-2xl text-xs font-semibold ${
+                        !category ? "bg-primary text-primary-foreground" : "text-foreground"
+                      }`}
+                    >
+                      All Categories
+                    </button>
+
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.slug || cat.id}
+                        type="button"
                         onClick={() => {
-                          handleSelectCategory(catId);
-                          setSidebarOpen(false);
+                          setCategory(cat.slug || cat._id || cat.id || "");
+                          setMobileSidebarOpen(false);
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors ${
-                          filters.categoryId === catId
-                            ? "bg-primary/10 text-primary font-bold"
-                            : "text-muted-foreground hover:text-foreground"
+                        className={`w-full text-left px-4 py-2.5 rounded-2xl text-xs font-semibold ${
+                          category === (cat.slug || cat._id || cat.id)
+                            ? "bg-primary text-primary-foreground font-bold"
+                            : "text-foreground hover:bg-muted"
                         }`}
                       >
                         {cat.name}
                       </button>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── Product Grid ── */}
+          <main className="lg:col-span-3">
+            {productsLoading && products.length === 0 ? (
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div
+                    key={n}
+                    className="h-80 rounded-3xl border border-border bg-card/60 animate-pulse"
+                  />
+                ))}
               </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-20 border border-dashed border-border rounded-3xl p-8 bg-card/40">
+                <Package size={40} className="mx-auto mb-3 text-muted-foreground/40" />
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  No design resources match your criteria
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-6">
+                  Try adjusting your search terms, selecting different categories, or clearing tags.
+                </p>
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-xs cursor-pointer shadow-sm"
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            ) : (
+              <>
+                <motion.div
+                  layout
+                  className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6"
+                >
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id || product._id}
+                      product={product}
+                      onProductClick={handleProductSelect}
+                      authUser={authUser}
+                      onWishlistToggle={toggleWishlist}
+                      onAuthOpen={openAuthModal}
+                      categories={categories}
+                      wishlist={wishlist}
+                      isWishlisted={wishlist.includes(product.id || product._id || "")}
+                    />
+                  ))}
+                </motion.div>
 
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-md"
-              >
-                Apply Filters ({filtered.length})
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-3 mt-12 pt-6 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setPage(Math.max(1, page - 1))}
+                      disabled={page <= 1}
+                      className="px-3.5 py-2 rounded-2xl border border-border bg-card text-foreground text-xs font-mono font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:border-primary/50 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <ChevronLeft size={14} />
+                      Prev
+                    </button>
 
-      <Footer onNavigate={onNavigate} categories={categories} />
-    </motion.main>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      Page <strong className="text-foreground">{page}</strong> of{" "}
+                      <strong className="text-foreground">{totalPages}</strong>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setPage(Math.min(totalPages, page + 1))}
+                      disabled={page >= totalPages}
+                      className="px-3.5 py-2 rounded-2xl border border-border bg-card text-foreground text-xs font-mono font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:border-primary/50 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      Next
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
   );
 }
+
+export default BrowsePage;

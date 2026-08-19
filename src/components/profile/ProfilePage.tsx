@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import React, { useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -12,700 +16,822 @@ import {
   Camera,
   Upload,
   Link2,
+  Shield,
+  Eye,
+  EyeOff,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Trash2,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  editProfileSchema,
+  changePasswordSchema,
+  type EditProfileFormData,
+  type ChangePasswordFormData,
+} from "@/lib/validations/auth";
+import { UnverifiedEmailBanner } from "@/components/layout/UnverifiedEmailBanner";
+import { EmailVerificationModal } from "@/components/auth/EmailVerificationModal";
 import { toast } from "sonner";
-import type { AuthUser, Product } from "../../types";
+import type { User as UserType, Product, Page } from "@/types/api";
 
 export function ProfilePage({
-  authUser,
-  onUpdate,
-  onLogout,
   onProductClick,
+  onNavigate,
 }: {
-  authUser: AuthUser;
-  onUpdate: (updated: Partial<AuthUser>) => void;
-  onLogout: () => void;
-  onProductClick: (p: Product) => void;
+  onProductClick?: (p: Product) => void;
+  onNavigate?: (page: Page) => void;
 }) {
+  const {
+    authUser,
+    updateProfile,
+    uploadAvatar,
+    changePassword,
+    disconnectGoogle,
+    logout,
+    wishlist,
+    toggleWishlist,
+    openEmailVerifyModal,
+  } = useAuth();
+
   const [activeTab, setActiveTab] = useState<
-    "account" | "library" | "wishlist" | "settings"
+    "account" | "library" | "wishlist" | "security"
   >("account");
-  const [profileForm, setProfileForm] = useState({
-    name: authUser.name,
-    email: authUser.email,
-    avatar: authUser.avatar ?? "",
-    bio: authUser.bio ?? "",
-    website: authUser.website ?? "",
+
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── 1. Edit Profile Form ──
+  const {
+    register: registerProfile,
+    handleSubmit: handleSubmitProfile,
+    formState: { errors: errorsProfile, isSubmitting: isSubmittingProfile },
+    reset: resetProfile,
+  } = useForm<EditProfileFormData>({
+    resolver: zodResolver(editProfileSchema),
+    defaultValues: {
+      displayName: authUser?.displayName || authUser?.name || "",
+      userName: (authUser?.userName || "").toLowerCase(),
+      bio: authUser?.bio || "",
+      website: authUser?.website || "",
+      twitter: authUser?.socialLinks?.twitter || "",
+      github: authUser?.socialLinks?.github || "",
+      dribbble: authUser?.socialLinks?.dribbble || "",
+      figma: authUser?.socialLinks?.figma || "",
+      linkedin: authUser?.socialLinks?.linkedin || "",
+    },
   });
-  const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
-  const [pwStatus, setPwStatus] = useState<
-    "idle" | "sending" | "sent" | "error"
-  >("idle");
-  const [pwErrorMsg, setPwErrorMsg] = useState("");
-  const [libraryProducts, setLibraryProducts] = useState<Product[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(true);
-  const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
-  const [wishlistLoading, setWishlistLoading] = useState(true);
 
-  // Helper mapper for Supabase product records
-  const mapSupabaseProduct = (p: any): Product => {
-    const formatsArr = Array.isArray(p.formats) ? p.formats : ["Figma"];
-    const tagsArr = Array.isArray(p.tags) ? p.tags : [];
-    const gallery = p.product_images
-      ? p.product_images
-          .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-          .map((img: any) => img.image_url)
-      : [p.thumbnail_url].filter(Boolean);
-
-    return {
-      id: p.id,
-      title: p.title,
-      slug: p.slug,
-      shortDescription: p.short_description || "",
-      fullDescription: p.full_description || "",
-      price: 0,
-      isFree: true,
-      currency: "USD",
-      thumbnail:
-        p.thumbnail_url ||
-        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
-      galleryImages: gallery,
-      figmaPreviewUrl: p.figma_preview_url || undefined,
-      categoryId: p.category_id || "ui-kits",
-      subcategoryId: p.subcategory_id || undefined,
-      tags: tagsArr,
-      fileSize: p.file_size || "45 MB",
-      formats: formatsArr,
-      screensCount: p.screens_count || 0,
-      componentsCount: p.components_count || 0,
-      version: p.version || "v1.0.0",
-      supportsVariables: p.supports_variables ?? true,
-      supportsAutoLayout: p.supports_auto_layout ?? true,
-      supportsLightDark: p.supports_light_dark ?? true,
-      licenseType: p.license_type || "commercial",
-      downloadsCount: p.downloads_count || 0,
-      viewsCount: p.views_count || 0,
-      rating: 5.0,
-      reviewsCount: 0,
-      downloadFileUrl: p.download_file_url || "",
-      downloads: p.downloads_count || 0,
-      views: p.views_count || 0,
-      featured: p.is_featured || false,
-      trending: false,
-      isNew: false,
-      createdAt: p.created_at || new Date().toISOString(),
-      updatedAt: p.updated_at || new Date().toISOString(),
-      specifications: {
-        fileSize: p.file_size || "45 MB",
-        format: formatsArr,
-        screens: p.screens_count || 0,
-        components: p.components_count || 0,
-        version: p.version || "v1.0.0",
-        compatibility: ["Figma"],
-        supportsVariables: p.supports_variables ?? true,
-        supportsAutoLayout: p.supports_auto_layout ?? true,
-        supportsLightDark: p.supports_light_dark ?? true,
-      },
-      license: {
-        type: "commercial",
-        allowCommercial: true,
-        allowUnlimitedProjects: true,
-        attributionRequired: false,
-      },
-    };
+  const onProfileSubmit = async (data: EditProfileFormData) => {
+    try {
+      await updateProfile({
+        displayName: data.displayName,
+        userName: data.userName.toLowerCase().trim(),
+        bio: data.bio || undefined,
+        website: data.website || undefined,
+        socialLinks: {
+          twitter: data.twitter || undefined,
+          github: data.github || undefined,
+          dribbble: data.dribbble || undefined,
+          figma: data.figma || undefined,
+          linkedin: data.linkedin || undefined,
+        },
+      });
+    } catch {
+      // Handled in context toast
+    }
   };
 
-  // Fetch downloaded products from Supabase
-  useEffect(() => {
-    const fetchDownloads = async () => {
-      try {
-        setLibraryLoading(true);
-        const { data: downloads, error: downloadsError } = await supabase
-          .from("downloads")
-          .select("product_id")
-          .eq("user_id", authUser.id);
+  // ── 2. Change Password Form ──
+  const {
+    register: registerPassword,
+    handleSubmit: handleSubmitPassword,
+    formState: { errors: errorsPassword, isSubmitting: isSubmittingPassword },
+    reset: resetPasswordForm,
+  } = useForm<ChangePasswordFormData>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
 
-        if (downloadsError) {
-          console.error("Error fetching downloads:", downloadsError);
-          setLibraryLoading(false);
-          return;
-        }
+  const onPasswordSubmit = async (data: ChangePasswordFormData) => {
+    try {
+      await changePassword({
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+      resetPasswordForm();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to update password";
+      toast.error(msg);
+    }
+  };
 
-        if (downloads && downloads.length > 0) {
-          const productIds = downloads.map((d) => d.product_id);
-          const { data: products, error: productsError } = await supabase
-            .from("products")
-            .select("*")
-            .in("id", productIds);
-
-          if (productsError) {
-            console.error("Error fetching products:", productsError);
-          } else {
-            setLibraryProducts((products || []).map(mapSupabaseProduct));
-          }
-        } else {
-          setLibraryProducts([]);
-        }
-        setLibraryLoading(false);
-      } catch (err) {
-        console.error("Error fetching library:", err);
-        setLibraryLoading(false);
-      }
-    };
-
-    fetchDownloads();
-  }, [authUser.id]);
-
-  // Fetch wishlist products from Supabase
-  useEffect(() => {
-    const fetchWishlist = async () => {
-      try {
-        setWishlistLoading(true);
-        const { data: wishlist, error: wishlistError } = await supabase
-          .from("wishlist")
-          .select("product_id")
-          .eq("user_id", authUser.id);
-
-        if (wishlistError) {
-          console.error("Error fetching wishlist:", wishlistError);
-          setWishlistLoading(false);
-          return;
-        }
-
-        if (wishlist && wishlist.length > 0) {
-          const productIds = wishlist.map((w) => w.product_id);
-          const { data: products, error: productsError } = await supabase
-            .from("products")
-            .select("*")
-            .in("id", productIds);
-
-          if (productsError) {
-            console.error("Error fetching products:", productsError);
-          } else {
-            setWishlistProducts((products || []).map(mapSupabaseProduct));
-          }
-        } else {
-          setWishlistProducts([]);
-        }
-        setWishlistLoading(false);
-      } catch (err) {
-        console.error("Error fetching wishlist:", err);
-        setWishlistLoading(false);
-      }
-    };
-
-    fetchWishlist();
-  }, [authUser.id]);
-
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── Avatar Upload Handler ──
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image file must be under 2MB.");
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (PNG, JPG, WEBP)");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setProfileForm((f) => ({ ...f, avatar: base64 }));
-      toast.success("Avatar loaded! Click 'Save Changes' to update your profile.");
-    };
-    reader.readAsDataURL(file);
-  };
 
-  const handleProfileSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveStatus("saving");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Avatar image must be smaller than 5MB");
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profileForm.name,
-          avatar_url: profileForm.avatar,
-          bio: profileForm.bio,
-          website: profileForm.website,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", authUser.id);
-
-      if (error) throw error;
-
-      onUpdate({
-        name: profileForm.name,
-        avatar: profileForm.avatar,
-        bio: profileForm.bio,
-        website: profileForm.website,
-      });
-      setSaveStatus("saved");
-      toast.success("Profile saved successfully!");
-      setTimeout(() => setSaveStatus("idle"), 2500);
+      setAvatarUploading(true);
+      await uploadAvatar(file);
     } catch (err: any) {
-      console.error(err);
-      setSaveStatus("error");
-      toast.error(err.message || "Failed to update profile.");
+      toast.error(err?.message || "Failed to upload avatar");
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleSendPasswordReset = async () => {
-    setPwErrorMsg("");
-    setPwStatus("sending");
-
+  // ── Disconnect Google ──
+  const handleDisconnectGoogle = async () => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        authUser.email,
-        {
-          redirectTo: `${window.location.origin}/?type=recovery`,
-        }
-      );
-
-      if (error) throw error;
-
-      setPwStatus("sent");
-      toast.success("Password reset link sent to your email.");
+      setDisconnectingGoogle(true);
+      await disconnectGoogle();
     } catch (err: any) {
-      console.error("Reset password error:", err);
-      setPwStatus("error");
-      setPwErrorMsg(err?.message || "Failed to send reset email.");
-      toast.error(err?.message || "Failed to send reset email.");
+      toast.error(err?.message || "Failed to disconnect Google");
+    } finally {
+      setDisconnectingGoogle(false);
     }
   };
+
+  if (!authUser) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 text-primary">
+          <User size={30} />
+        </div>
+        <h2 className="text-2xl font-display font-bold text-foreground mb-2">
+          Sign In Required
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Please sign in to access your Layerat profile, settings, and library.
+        </p>
+      </div>
+    );
+  }
+
+  const isVerified = Boolean(
+    authUser.isVerified || authUser.isEmailVerified
+  );
 
   const inputClass =
-    "w-full px-5 py-3.5 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all duration-200 text-sm";
-
-  const initials = authUser.name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  const tabs: {
-    id: typeof activeTab;
-    label: string;
-    icon: React.ElementType;
-  }[] = [
-    { id: "account", label: "Account", icon: User },
-    { id: "library", label: "My Downloads", icon: Download },
-    { id: "wishlist", label: "Saved Resources", icon: Heart },
-    { id: "settings", label: "Settings", icon: Settings },
-  ];
+    "w-full px-4 py-3 rounded-2xl border border-border bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all text-sm";
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      className="min-h-screen pt-20 lg:pt-24 pb-20"
-    >
-      <div className="max-w-5xl mx-auto px-4 lg:px-10 py-10 lg:py-14">
-        {/* Profile header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-10 pb-10 border-b border-border">
-          {authUser.avatar ? (
-            <img
-              src={authUser.avatar}
-              alt={authUser.name}
-              className="w-20 h-20 rounded-3xl object-cover border-2 border-primary/40 shadow-lg shadow-primary/20 shrink-0"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-3xl bg-primary flex items-center justify-center text-2xl font-display font-black text-primary-foreground shrink-0 shadow-lg shadow-primary/20">
-              {initials}
+    <div className="min-h-screen bg-background pb-20">
+      {/* Email Verification Banner */}
+      <UnverifiedEmailBanner authUser={authUser} />
+      <EmailVerificationModal />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Profile Hero Card */}
+        <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10 pointer-events-none" />
+
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            {/* Avatar & Upload Trigger */}
+            <div className="relative group shrink-0">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-2 border-border bg-muted flex items-center justify-center shadow-md">
+                {authUser.avatar ? (
+                  <img
+                    src={authUser.avatar}
+                    alt={authUser.displayName || authUser.userName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-3xl font-display font-bold text-primary">
+                    {(authUser.displayName || authUser.userName || "U")[0].toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              {/* Camera upload overlay */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="absolute inset-0 rounded-3xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-medium cursor-pointer"
+                title="Change Avatar"
+              >
+                {avatarUploading ? (
+                  <Loader2 size={20} className="animate-spin text-primary" />
+                ) : (
+                  <>
+                    <Camera size={20} className="mb-1" />
+                    <span>Upload</span>
+                  </>
+                )}
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
             </div>
-          )}
-          <div className="flex-1">
-            <h1 className="text-2xl font-display font-extrabold text-foreground">
-              {authUser.name}
-            </h1>
-            <p className="text-muted-foreground text-sm font-mono">{authUser.email}</p>
-            {authUser.role === "admin" && (
-              <span className="inline-block mt-2 text-[10px] font-mono font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
-                Studio Admin
-              </span>
-            )}
+
+            {/* Profile Info */}
+            <div className="flex-1 text-center sm:text-left min-w-0">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mb-2">
+                <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground truncate">
+                  {authUser.displayName || authUser.userName}
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20 capitalize">
+                  {authUser.role || "Designer"}
+                </span>
+                {isVerified ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    Verified
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openEmailVerifyModal}
+                    className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors cursor-pointer"
+                  >
+                    Unverified · Verify Now
+                  </button>
+                )}
+              </div>
+
+              <p className="text-sm font-mono text-muted-foreground mb-3">
+                @{authUser.userName || "username"} · {authUser.email}
+              </p>
+
+              {authUser.bio && (
+                <p className="text-sm text-foreground/80 leading-relaxed max-w-2xl mb-4">
+                  {authUser.bio}
+                </p>
+              )}
+
+              {/* Stats badges */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-2 border-t border-border/50 text-xs text-muted-foreground font-mono">
+                <span>
+                  Downloads:{" "}
+                  <strong className="text-foreground">
+                    {authUser.statistics?.totalDownloads || authUser.downloads?.length || 0}
+                  </strong>
+                </span>
+                <span>·</span>
+                <span>
+                  Wishlist:{" "}
+                  <strong className="text-foreground">{wishlist.length}</strong>
+                </span>
+                {authUser.financialDetails && (
+                  <>
+                    <span>·</span>
+                    <span>
+                      Balance:{" "}
+                      <strong className="text-emerald-500">
+                        ${authUser.financialDetails.balance.toFixed(2)}
+                      </strong>
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Logout button */}
+            <div className="shrink-0 pt-2 sm:pt-0">
+              <button
+                type="button"
+                onClick={logout}
+                className="px-4 py-2 rounded-2xl border border-border hover:border-destructive/40 text-muted-foreground hover:text-destructive hover:bg-destructive/5 font-medium text-xs transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <LogOut size={14} />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:border-destructive/40 hover:text-destructive hover:bg-destructive/5 transition-colors cursor-pointer"
-          >
-            <LogOut size={14} /> Sign Out
-          </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-1">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                activeTab === id
-                  ? "bg-primary/10 text-primary border border-primary/25 font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card border border-transparent"
-              }`}
-            >
-              <Icon size={15} />
-              {label}
-              {id === "library" && (
-                <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-mono">
-                  {libraryProducts.length}
-                </span>
-              )}
-              {id === "wishlist" && wishlistProducts.length > 0 && (
-                <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 font-mono">
-                  {wishlistProducts.length}
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2 border-b border-border mb-8 overflow-x-auto pb-px">
+          {[
+            { id: "account", label: "Edit Profile", icon: User },
+            { id: "library", label: "My Downloads", icon: Package },
+            { id: "wishlist", label: "Saved Wishlist", icon: Heart },
+            { id: "security", label: "Security & Google", icon: Shield },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-5 py-3 rounded-t-2xl text-sm font-semibold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? "border-primary text-primary bg-primary/5"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon size={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Tab content */}
+        {/* Tab Contents */}
         <AnimatePresence mode="wait">
-          {/* Account tab */}
+          {/* ── TAB 1: EDIT PROFILE ── */}
           {activeTab === "account" && (
             <motion.div
               key="account"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
+              className="max-w-2xl"
             >
-              <form onSubmit={handleProfileSave} className="max-w-lg space-y-6 bg-card p-7 rounded-3xl border border-border">
-                {/* Avatar Uploader */}
-                <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-3">
-                    Profile Picture
-                  </label>
-                  <div className="flex items-center gap-5">
-                    <div className="relative group">
-                      {profileForm.avatar ? (
-                        <img
-                          src={profileForm.avatar}
-                          alt="Avatar preview"
-                          className="w-16 h-16 rounded-2xl object-cover border-2 border-primary/40 shadow-md"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center font-display font-black text-primary text-xl">
-                          {initials}
-                        </div>
-                      )}
-                      <label className="absolute inset-0 bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer">
-                        <Camera size={18} />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarFile}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
+              <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  Public Profile Information
+                </h3>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Update your display name, username, biography, and portfolio links.
+                </p>
 
-                    <div className="flex-1 space-y-2">
-                      <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border hover:border-primary/40 bg-background text-xs font-medium text-foreground hover:text-primary transition-colors cursor-pointer">
-                        <Upload size={13} />
-                        <span>Upload Local Image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarFile}
-                          className="hidden"
-                        />
+                <form onSubmit={handleSubmitProfile(onProfileSubmit)} className="space-y-5">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {/* Display Name */}
+                    <div>
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                        Display Name <span className="text-primary">*</span>
                       </label>
                       <input
-                        type="url"
-                        value={profileForm.avatar}
-                        onChange={(e) =>
-                          setProfileForm((f) => ({ ...f, avatar: e.target.value }))
-                        }
-                        placeholder="Or paste image URL (https://...)"
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-foreground focus:outline-none focus:border-primary/60"
+                        type="text"
+                        {...registerProfile("displayName")}
+                        className={inputClass}
                       />
+                      {errorsProfile.displayName && (
+                        <p className="text-xs text-destructive mt-1 font-medium">
+                          {errorsProfile.displayName.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Username */}
+                    <div>
+                      <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                        Username <span className="text-primary">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          {...registerProfile("userName")}
+                          className={`${inputClass} font-mono lowercase`}
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground/40">
+                          @
+                        </span>
+                      </div>
+                      {errorsProfile.userName && (
+                        <p className="text-xs text-destructive mt-1 font-medium">
+                          {errorsProfile.userName.message}
+                        </p>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    value={profileForm.name}
-                    onChange={(e) =>
-                      setProfileForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    required
-                    className={inputClass}
-                  />
-                </div>
+                  {/* Bio */}
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                      Biography
+                    </label>
+                    <textarea
+                      rows={3}
+                      {...registerProfile("bio")}
+                      placeholder="Senior Product Designer crafting Figma design systems..."
+                      className={`${inputClass} resize-none`}
+                    />
+                    {errorsProfile.bio && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        {errorsProfile.bio.message}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                    Email
-                  </label>
-                  <input
-                    value={profileForm.email}
-                    disabled
-                    className={`${inputClass} opacity-60 cursor-not-allowed`}
-                  />
-                </div>
+                  {/* Website */}
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                      Website / Portfolio
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        {...registerProfile("website")}
+                        placeholder="https://yourportfolio.com"
+                        className={inputClass}
+                      />
+                      <Link2
+                        size={16}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/40"
+                      />
+                    </div>
+                    {errorsProfile.website && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        {errorsProfile.website.message}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                    Bio / Headline
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={profileForm.bio}
-                    onChange={(e) =>
-                      setProfileForm((f) => ({ ...f, bio: e.target.value }))
-                    }
-                    placeholder="e.g. Lead Product Designer at Fintech Co."
-                    className={inputClass}
-                  />
-                </div>
+                  {/* Social Links Grid */}
+                  <div className="pt-2 border-t border-border/60">
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-3 font-medium">
+                      Social Profiles
+                    </label>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block mb-1">Twitter / X</span>
+                        <input
+                          type="text"
+                          {...registerProfile("twitter")}
+                          placeholder="@username"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block mb-1">Dribbble</span>
+                        <input
+                          type="text"
+                          {...registerProfile("dribbble")}
+                          placeholder="dribbble.com/username"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block mb-1">Figma Profile</span>
+                        <input
+                          type="text"
+                          {...registerProfile("figma")}
+                          placeholder="@figma_handle"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block mb-1">LinkedIn</span>
+                        <input
+                          type="text"
+                          {...registerProfile("linkedin")}
+                          placeholder="linkedin.com/in/username"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                    Portfolio / Website
-                  </label>
-                  <input
-                    type="url"
-                    value={profileForm.website}
-                    onChange={(e) =>
-                      setProfileForm((f) => ({ ...f, website: e.target.value }))
-                    }
-                    placeholder="https://dribbble.com/yourhandle"
-                    className={inputClass}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saveStatus === "saving"}
-                  className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_30px_rgba(170,255,56,0.2)] disabled:opacity-60 transition-all duration-300 cursor-pointer"
-                >
-                  {saveStatus === "saving" ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />{" "}
-                      Saving...
-                    </>
-                  ) : saveStatus === "saved" ? (
-                    <>
-                      <CheckCircle size={15} /> Saved!
-                    </>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </button>
-              </form>
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingProfile}
+                      className="px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_25px_rgba(170,255,56,0.25)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {isSubmittingProfile ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Profile Changes"
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </motion.div>
           )}
 
-          {/* Library tab */}
+          {/* ── TAB 2: MY DOWNLOADS / LIBRARY ── */}
           {activeTab === "library" && (
             <motion.div
               key="library"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
+              className="space-y-6"
             >
-              {libraryLoading ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-sm font-mono">Loading your library...</p>
-                </div>
-              ) : libraryProducts.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground bg-card rounded-3xl border border-border p-8">
-                  <Package size={40} className="mx-auto mb-4 opacity-30 text-primary" />
-                  <p className="font-semibold text-foreground mb-1 text-lg">
-                    Your downloaded library is empty
-                  </p>
-                  <p className="text-sm max-w-sm mx-auto text-muted-foreground">
-                    Explore our 100% free Figma kits, templates, and design systems to find and download them here.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {libraryProducts.map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => onProductClick(p)}
-                      className="group cursor-pointer flex gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200"
+              <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  Downloaded Resources & Kits
+                </h3>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Access and re-download all Figma files previously added to your studio account.
+                </p>
+
+                {(!authUser.downloads || authUser.downloads.length === 0) ? (
+                  <div className="text-center py-12 border border-dashed border-border rounded-2xl p-6">
+                    <Package size={32} className="mx-auto mb-3 text-muted-foreground/40" />
+                    <p className="text-sm font-semibold text-foreground mb-1">
+                      No downloads yet
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Explore our 100% free Figma design library and download kits with a single click.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.("browse")}
+                      className="px-5 py-2 rounded-full bg-primary text-primary-foreground font-bold text-xs cursor-pointer shadow-sm"
                     >
-                      <img
-                        src={p.thumbnail}
-                        alt={p.title}
-                        loading="lazy"
-                        className="w-16 h-16 rounded-xl object-cover shrink-0 border border-border"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                          {p.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                          {p.shortDescription}
-                        </p>
-                        <div className="flex items-center gap-1 mt-2">
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-bold">
-                            Downloaded Free
+                      Browse Free Resources
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {authUser.downloads.map((item: any, i: number) => (
+                      <div
+                        key={i}
+                        className="p-4 rounded-2xl border border-border bg-background flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-foreground truncate">
+                            {typeof item === "string" ? `Product #${item.slice(-6)}` : item.title}
+                          </p>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            100% Free · Figma File
                           </span>
                         </div>
+                        <button
+                          type="button"
+                          className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary font-mono text-xs font-bold hover:bg-primary/20 transition-colors"
+                        >
+                          Get File
+                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
-          {/* Wishlist tab */}
+          {/* ── TAB 3: WISHLIST ── */}
           {activeTab === "wishlist" && (
             <motion.div
               key="wishlist"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
             >
-              {wishlistLoading ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-sm font-mono">Loading your saved items...</p>
-                </div>
-              ) : wishlistProducts.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground bg-card rounded-3xl border border-border p-8">
-                  <Heart size={40} className="mx-auto mb-4 opacity-30 text-primary" />
-                  <p className="font-semibold text-foreground mb-1 text-lg">
-                    Nothing saved yet
-                  </p>
-                  <p className="text-sm max-w-sm mx-auto text-muted-foreground">
-                    Tap the heart icon on any design resource to save it for quick access.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {wishlistProducts.map((p) => (
-                    <div
-                      key={p.id}
-                      onClick={() => onProductClick(p)}
-                      className="group cursor-pointer flex gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-all duration-200"
+              <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  Saved Wishlist Items ({wishlist.length})
+                </h3>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Design files and UI kits you've saved for future inspiration and projects.
+                </p>
+
+                {wishlist.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-border rounded-2xl p-6">
+                    <Heart size={32} className="mx-auto mb-3 text-muted-foreground/40" />
+                    <p className="text-sm font-semibold text-foreground mb-1">
+                      Your wishlist is empty
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Click the heart icon on any UI kit or design system to save it here.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.("browse")}
+                      className="px-5 py-2 rounded-full bg-primary text-primary-foreground font-bold text-xs cursor-pointer shadow-sm"
                     >
-                      <img
-                        src={p.thumbnail}
-                        alt={p.title}
-                        loading="lazy"
-                        className="w-16 h-16 rounded-xl object-cover shrink-0 border border-border"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                          {p.title}
-                        </p>
-                        <p className="text-xs text-primary font-mono font-bold mt-0.5">
-                          100% Free
-                        </p>
-                        <div className="flex items-center gap-0.5 mt-1.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              size={10}
-                              className={
-                                i < Math.round(p.rating || 0)
-                                  ? "text-primary fill-primary"
-                                  : "text-border"
-                              }
-                            />
-                          ))}
+                      Explore Library
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {wishlist.map((productId, i) => (
+                      <div
+                        key={productId || i}
+                        className="p-4 rounded-2xl border border-border bg-background flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-foreground truncate">
+                            Item ID: {productId.slice(-8)}
+                          </p>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            Saved in studio
+                          </span>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleWishlist(productId)}
+                          className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          title="Remove"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
-          {/* Settings tab */}
-          {activeTab === "settings" && (
+          {/* ── TAB 4: SECURITY & GOOGLE ── */}
+          {activeTab === "security" && (
             <motion.div
-              key="settings"
+              key="security"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25 }}
+              className="max-w-2xl space-y-8"
             >
-              <div className="max-w-lg space-y-8 bg-card p-7 rounded-3xl border border-border">
-                {/* Change password */}
-                <div>
-                  <h3 className="text-lg font-display font-bold text-foreground mb-2">
-                    Security & Password
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-5">
-                    We’ll send a secure link to your email. Click it to set a new password.
-                  </p>
+              {/* Google Account Link Card */}
+              <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  Connected Accounts
+                </h3>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Manage third-party single sign-on providers linked to your account.
+                </p>
 
-                  {pwStatus === "error" && (
-                    <p className="text-sm text-destructive-foreground bg-destructive/15 border border-destructive/20 rounded-xl px-4 py-3 mb-4">
-                      {pwErrorMsg}
-                    </p>
-                  )}
-
-                  {pwStatus === "sent" ? (
-                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm text-foreground">
-                      <p className="font-medium mb-1 text-primary">Check your email</p>
-                      <p className="text-muted-foreground">
-                        We sent a password reset link to{" "}
-                        <span className="font-medium text-foreground">{authUser.email}</span>.
+                <div className="flex items-center justify-between p-4 rounded-2xl border border-border bg-background">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Google Account</p>
+                      <p className="text-[11px] text-muted-foreground font-mono">
+                        {authUser.googleId || authUser.provider === "google"
+                          ? "Connected to " + authUser.email
+                          : "Not connected"}
                       </p>
                     </div>
-                  ) : (
+                  </div>
+
+                  {authUser.googleId || authUser.provider === "google" ? (
                     <button
                       type="button"
-                      onClick={handleSendPasswordReset}
-                      disabled={pwStatus === "sending"}
-                      className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all duration-300 cursor-pointer"
+                      onClick={handleDisconnectGoogle}
+                      disabled={disconnectingGoogle}
+                      className="px-3.5 py-1.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-mono font-bold transition-colors cursor-pointer disabled:opacity-50"
                     >
-                      {pwStatus === "sending" ? (
-                        <>
-                          <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                          Sending link...
-                        </>
-                      ) : (
-                        "Send reset link"
-                      )}
+                      {disconnectingGoogle ? "Disconnecting..." : "Disconnect"}
                     </button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Not Linked
+                    </span>
                   )}
                 </div>
+              </div>
 
-                {/* Notifications */}
-                <div className="pt-6 border-t border-border">
-                  <h3 className="text-lg font-display font-bold text-foreground mb-4">
-                    Community Updates
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-4 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          New Free Resources
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Receive weekly emails about top new Figma kits and UI tools
-                        </p>
-                      </div>
-                      <button className="w-11 h-6 bg-primary rounded-full relative transition-colors shrink-0">
-                        <span className="absolute right-1 top-1 w-4 h-4 bg-primary-foreground rounded-full" />
+              {/* Change Password Form */}
+              <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+                <h3 className="text-lg font-display font-bold text-foreground mb-1">
+                  Update Account Password
+                </h3>
+                <p className="text-xs text-muted-foreground mb-6">
+                  Ensure your account is protected with a secure, unique password.
+                </p>
+
+                <form onSubmit={handleSubmitPassword(onPasswordSubmit)} className="space-y-4">
+                  {/* Current Password */}
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                      Current Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPass ? "text" : "password"}
+                        {...registerPassword("currentPassword")}
+                        placeholder="••••••••"
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPass(!showCurrentPass)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
+                    {errorsPassword.currentPassword && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        {errorsPassword.currentPassword.message}
+                      </p>
+                    )}
                   </div>
-                </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPass ? "text" : "password"}
+                        {...registerPassword("newPassword")}
+                        placeholder="Min. 6 characters"
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {errorsPassword.newPassword && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        {errorsPassword.newPassword.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-1.5 font-medium">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPass ? "text" : "password"}
+                        {...registerPassword("confirmPassword")}
+                        placeholder="Repeat new password"
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPass(!showConfirmPass)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {errorsPassword.confirmPassword && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        {errorsPassword.confirmPassword.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingPassword}
+                      className="px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:shadow-[0_0_25px_rgba(170,255,56,0.25)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {isSubmittingPassword ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        "Update Password"
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </div>
   );
 }
+export default ProfilePage;

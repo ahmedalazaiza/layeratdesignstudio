@@ -7,6 +7,13 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { Toaster } from "sonner";
 
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import { AuthProvider } from "@/context/AuthContext";
+
+const GOOGLE_CLIENT_ID =
+  process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+  "108392817283-sample-layerat-client.apps.googleusercontent.com";
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -42,21 +49,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <QueryClientProvider client={queryClient}>
-        <NuqsAdapter>
-          {children}
-          {/* Layerat Luxury Bottom-Left Sonner Notification Toaster */}
-          <Toaster
-            position="bottom-left"
-            richColors
-            closeButton
-            duration={4000}
-          />
-        </NuqsAdapter>
-        {process.env.NODE_ENV === "development" && (
-          <ReactQueryDevtools initialIsOpen={false} />
-        )}
-      </QueryClientProvider>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <NuqsAdapter>
+              {children}
+              {/* Layerat Luxury Bottom-Left Sonner Notification Toaster */}
+              <Toaster
+                position="bottom-left"
+                richColors
+                closeButton
+                duration={4000}
+              />
+            </NuqsAdapter>
+          </AuthProvider>
+          {process.env.NODE_ENV === "development" && (
+            <ReactQueryDevtools initialIsOpen={false} />
+          )}
+        </QueryClientProvider>
+      </GoogleOAuthProvider>
     </NextThemesProvider>
   );
 }

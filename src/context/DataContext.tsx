@@ -34,9 +34,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProducts = useCallback(async () => {
     try {
-      const data = await productService.getProducts();
-      if (data && data.length > 0) {
-        setProducts(data);
+      const res = await productService.getProducts();
+      const prods = Array.isArray(res) ? res : res?.products || [];
+      if (prods && prods.length > 0) {
+        setProducts(prods);
       }
     } catch (err) {
       console.warn("Failed to refresh products", err);

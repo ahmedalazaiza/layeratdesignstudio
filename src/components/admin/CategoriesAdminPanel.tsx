@@ -1,504 +1,555 @@
-import React, { useEffect, useState } from "react";
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle,
-  CheckCircle,
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  flexRender,
+  createColumnHelper,
+  type SortingState,
+} from "@tanstack/react-table";
+import {
   Layers,
-  Layout,
-  FileText,
-  Package,
-  Smartphone,
-  Globe,
-  Code,
-  Zap,
+  Plus,
+  Edit2,
+  Trash2,
+  Search,
+  ArrowUpDown,
+  Check,
+  X,
+  Loader2,
+  FolderTree,
+  FileCode,
+  Tag as TagIcon,
+  Sparkles,
 } from "lucide-react";
-import { CustomSelect } from "../ui/CustomSelect";
-import { supabase } from "../../lib/supabase";
+import { adminService, type CategoryPayload } from "@/services/adminService";
 import { toast } from "sonner";
+import type { Category } from "@/types/api";
 
-const iconMap: Record<string, React.ElementType> = {
-  Layers,
-  Layout,
-  FileText,
-  Package,
-  Smartphone,
-  Globe,
-  Code,
-  Zap,
-};
+const columnHelper = createColumnHelper<Category>();
 
-const iconSelectOptions = [
-  { value: "Layers", label: "Layers", icon: Layers },
-  { value: "Layout", label: "Layout", icon: Layout },
-  { value: "FileText", label: "FileText", icon: FileText },
-  { value: "Package", label: "Package", icon: Package },
-  { value: "Smartphone", label: "Smartphone", icon: Smartphone },
-  { value: "Globe", label: "Globe", icon: Globe },
-  { value: "Code", label: "Code", icon: Code },
-  { value: "Zap", label: "Zap", icon: Zap },
-];
+export function CategoriesAdminPanel({ categories: initialCategories }: { categories?: Category[] } = {}) {
+  const queryClient = useQueryClient();
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
 
-interface CategoriesAdminPanelProps {
-  categories?: any[];
-}
+  // Modal Dialog States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-export function CategoriesAdminPanel({ categories: initialCategories }: CategoriesAdminPanelProps = {}) {
-  const [categories, setCategories] = useState<any[]>(initialCategories || []);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
-  const [subForm, setSubForm] = useState({
-    category_id: "",
-    name: "",
-    slug: "",
+  // Form State
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [description, setDescription] = useState("");
+  const [color, setColor] = useState("#aaff38");
+  const [subcategories, setSubcategories] = useState<{ name: string; slug?: string }[]>([]);
+  const [newSubName, setNewSubName] = useState("");
+  const [includedFiles, setIncludedFiles] = useState<string[]>(["Figma (.fig)"]);
+
+  // 1. Fetch live categories from backend API
+  const { data: categories = [], isLoading } = useQuery<Category[]>({
+    queryKey: ["adminCategories"],
+    queryFn: () => adminService.getCategories(),
   });
-  const [subSaving, setSubSaving] = useState(false);
 
-  const emptyForm = {
-    name: "",
-    slug: "",
-    icon: "Layers",
-    color: "#aaff38",
-    sort_order: 0,
+  // 2. Mutations
+  const createMutation = useMutation({
+    mutationFn: (payload: CategoryPayload) => adminService.createCategory(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminCategories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success("Category created successfully!");
+      closeModal();
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to create category");
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<CategoryPayload> }) =>
+      adminService.updateCategory(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminCategories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success("Category updated successfully!");
+      closeModal();
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update category");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminService.deleteCategory(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminCategories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success("Category deleted successfully!");
+      setDeleteConfirmId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete category");
+    },
+  });
+
+  const openCreateModal = () => {
+    setEditingCategory(null);
+    setName("");
+    setSlug("");
+    setDescription("");
+    setColor("#aaff38");
+    setSubcategories([
+      { name: "Design Systems", slug: "design-systems" },
+      { name: "UI Kits", slug: "ui-kits" },
+    ]);
+    setIncludedFiles(["Figma (.fig)"]);
+    setIsModalOpen(true);
   };
 
-  const [form, setForm] = useState(emptyForm);
-
-  const loadCategories = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    if (error) console.error(error);
-    setCategories(data || []);
-
-    const { data: subs } = await supabase
-      .from("subcategories")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    setSubcategories(subs || []);
-    setLoading(false);
+  const openEditModal = (cat: Category) => {
+    setEditingCategory(cat);
+    setName(cat.name);
+    setSlug(cat.slug || "");
+    setDescription(cat.description || "");
+    setColor(cat.color || "#aaff38");
+    setSubcategories(
+      (cat.subcategories || []).map((s) => ({
+        name: s.name,
+        slug: s.slug,
+      }))
+    );
+    setIncludedFiles(cat.includedFiles || ["Figma (.fig)"]);
+    setIsModalOpen(true);
   };
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingCategory(null);
+  };
 
-  const generateSlug = (name: string) =>
-    name
+  const addSubcategory = () => {
+    if (!newSubName.trim()) return;
+    const subSlug = newSubName
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-");
-
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-    setError("");
-    setSuccess("");
+      .replace(/\s+/g, "-");
+    setSubcategories([...subcategories, { name: newSubName.trim(), slug: subSlug }]);
+    setNewSubName("");
   };
 
-  const startEdit = (cat: any) => {
-    setEditingId(cat.id);
-    setForm({
-      name: cat.name || "",
-      slug: cat.slug || "",
-      icon: cat.icon || "Layers",
-      color: cat.color || "#aaff38",
-      sort_order: cat.sort_order || 0,
-    });
-    setError("");
-    setSuccess("");
+  const removeSubcategory = (index: number) => {
+    setSubcategories(subcategories.filter((_, i) => i !== index));
   };
 
-  const handleAddSubcategory = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subForm.category_id || !subForm.name.trim() || !subForm.slug.trim())
-      return;
-    setSubSaving(true);
-    const { error } = await supabase.from("subcategories").insert({
-      category_id: subForm.category_id,
-      name: subForm.name.trim(),
-      slug: subForm.slug.trim(),
-      sort_order: 0,
-    });
-    setSubSaving(false);
-    if (error) {
-      setError(error.message);
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Subcategory added.");
-    setSubForm({ category_id: "", name: "", slug: "" });
-    loadCategories();
-  };
-
-  const handleDeleteSubcategory = async (id: string) => {
-    if (!confirm("Delete this subcategory?")) return;
-    const { error } = await supabase.from("subcategories").delete().eq("id", id);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    toast.success("Subcategory deleted.");
-    loadCategories();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!form.name.trim() || !form.slug.trim()) {
-      setError("Name and slug are required.");
+    if (!name.trim()) {
+      toast.error("Category name is required");
       return;
     }
 
-    setSaving(true);
-
-    const payload = {
-      name: form.name.trim(),
-      slug: form.slug.trim(),
-      icon: form.icon,
-      color: form.color,
-      sort_order: Number(form.sort_order) || 0,
+    const payload: CategoryPayload = {
+      name: name.trim(),
+      slug: slug.trim() || undefined,
+      description: description.trim() || undefined,
+      color,
+      subcategories,
+      includedFiles,
     };
 
-    const result = editingId
-      ? await supabase.from("categories").update(payload).eq("id", editingId)
-      : await supabase.from("categories").insert(payload);
-
-    setSaving(false);
-
-    if (result.error) {
-      if (result.error.code === "23505") {
-        setError("This slug already exists.");
-      } else {
-        setError(result.error.message || "Something went wrong.");
-      }
-      return;
+    if (editingCategory) {
+      const catId = editingCategory._id || editingCategory.id || "";
+      updateMutation.mutate({ id: catId, payload });
+    } else {
+      createMutation.mutate(payload);
     }
-
-    const msg = editingId ? "Category updated." : "Category created.";
-    setSuccess(msg);
-    toast.success(msg);
-    resetForm();
-    loadCategories();
   };
 
-  const handleDeleteCategory = async (id: string, name: string) => {
-    if (!confirm(`Delete category "${name}" and its subcategories?`)) return;
-    const { error } = await supabase.from("categories").delete().eq("id", id);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    toast.success("Category deleted.");
-    if (editingId === id) resetForm();
-    loadCategories();
-  };
-
-  const inputCls =
-    "w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all";
-
-  const categorySelectOptions = [
-    { value: "", label: "Select Parent Category" },
-    ...categories.map((c) => ({ value: c.id, label: c.name })),
-  ];
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      {/* LEFT: Form */}
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-3 mb-6">
-            <div>
-              <h2 className="text-lg font-display font-bold text-foreground">
-                {editingId ? "Edit Category" : "Add New Category"}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                Categories group resources across the platform.
-              </p>
+  // TanStack Table Columns
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        header: "Category Name",
+        cell: (info) => {
+          const cat = info.row.original;
+          return (
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs"
+                style={{
+                  backgroundColor: `${cat.color || "#aaff38"}20`,
+                  color: cat.color || "#aaff38",
+                }}
+              >
+                <Layers size={16} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground">{cat.name}</p>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  /{cat.slug || cat.id}
+                </span>
+              </div>
             </div>
-            {editingId && (
+          );
+        },
+      }),
+
+      columnHelper.accessor((row) => (row.subcategories ? row.subcategories.length : 0), {
+        id: "subcategories",
+        header: "Subcategories",
+        cell: (info) => {
+          const cat = info.row.original;
+          const subs = cat.subcategories || [];
+          return (
+            <div className="flex flex-wrap gap-1 max-w-xs">
+              {subs.length === 0 ? (
+                <span className="text-[11px] font-mono text-muted-foreground italic">None</span>
+              ) : (
+                subs.slice(0, 3).map((s, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-muted text-muted-foreground border border-border"
+                  >
+                    {s.name}
+                  </span>
+                ))
+              )}
+              {subs.length > 3 && (
+                <span className="text-[10px] font-mono text-primary font-bold">
+                  +{subs.length - 3} more
+                </span>
+              )}
+            </div>
+          );
+        },
+      }),
+
+      columnHelper.accessor("productCount", {
+        header: "Products",
+        cell: (info) => (
+          <span className="text-xs font-mono font-bold text-foreground">
+            {info.getValue() || 0}
+          </span>
+        ),
+      }),
+
+      columnHelper.display({
+        id: "actions",
+        header: "Actions",
+        cell: (info) => {
+          const cat = info.row.original;
+          const catId = cat._id || cat.id || "";
+          return (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={resetForm}
-                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => openEditModal(cat)}
+                className="p-1.5 rounded-xl border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                title="Edit Category"
               >
-                Cancel
+                <Edit2 size={13} />
               </button>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                Name *
-              </label>
-              <input
-                value={form.name}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    name: e.target.value,
-                    slug: editingId ? f.slug : generateSlug(e.target.value),
-                  }))
-                }
-                className={inputCls}
-                required
-                placeholder="e.g. UI Kits"
-              />
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(catId)}
+                className="p-1.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
+                title="Delete Category"
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
+          );
+        },
+      }),
+    ],
+    []
+  );
 
-            <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                Slug *
-              </label>
-              <input
-                value={form.slug}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, slug: generateSlug(e.target.value) }))
-                }
-                className={`${inputCls} font-mono`}
-                required
-                placeholder="ui-kits"
-              />
-            </div>
+  const table = useReactTable({
+    data: categories,
+    columns,
+    state: {
+      globalFilter,
+      sorting,
+    },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
 
-            <div className="grid grid-cols-2 gap-3">
-              <CustomSelect
-                label="Icon"
-                options={iconSelectOptions}
-                value={form.icon}
-                onChange={(v) => setForm((f) => ({ ...f, icon: v }))}
-              />
+  const inputClass =
+    "w-full px-4 py-2.5 rounded-2xl border border-border bg-background text-foreground placeholder:text-muted-foreground/40 text-xs font-mono focus:outline-none focus:border-primary/60";
 
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                  Accent Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={form.color}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, color: e.target.value }))
-                    }
-                    className="w-11 h-11 rounded-xl border border-border p-1 bg-background cursor-pointer"
-                  />
-                  <input
-                    value={form.color}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, color: e.target.value }))
-                    }
-                    className={`${inputCls} font-mono`}
-                    placeholder="#aaff38"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                Sort Order
-              </label>
-              <input
-                type="number"
-                value={form.sort_order}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, sort_order: Number(e.target.value) }))
-                }
-                className={inputCls}
-              />
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-destructive-foreground bg-destructive/15 border border-destructive/20 rounded-xl px-4 py-3">
-                <AlertCircle size={15} /> {error}
-              </div>
-            )}
-            {success && (
-              <div className="flex items-center gap-2 text-sm text-primary bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 font-medium">
-                <CheckCircle size={15} /> {success}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 disabled:opacity-60 transition-all shadow-md shadow-primary/10 cursor-pointer"
-            >
-              {saving
-                ? "Saving..."
-                : editingId
-                ? "Save Category"
-                : "Create Category"}
-            </button>
-          </form>
-        </div>
-
-        {/* Add Subcategory Card */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <h3 className="text-base font-display font-bold text-foreground mb-1">
-            Add Subcategory
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Subcategories provide more detailed grouping for resources.
+  return (
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-display font-bold text-foreground">
+            Categories & Subcategories
+          </h2>
+          <p className="text-xs text-muted-foreground font-mono mt-0.5">
+            Manage top-level design categories and nested subcategory filters.
           </p>
-
-          <form onSubmit={handleAddSubcategory} className="space-y-4">
-            <CustomSelect
-              label="Parent Category *"
-              options={categorySelectOptions}
-              value={subForm.category_id}
-              onChange={(v) => setSubForm((f) => ({ ...f, category_id: v }))}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                  Subcategory Name *
-                </label>
-                <input
-                  value={subForm.name}
-                  onChange={(e) =>
-                    setSubForm((f) => ({
-                      ...f,
-                      name: e.target.value,
-                      slug: generateSlug(e.target.value),
-                    }))
-                  }
-                  className={inputCls}
-                  required
-                  placeholder="e.g. Mobile Apps"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono text-muted-foreground uppercase tracking-wide block mb-2">
-                  Slug *
-                </label>
-                <input
-                  value={subForm.slug}
-                  onChange={(e) =>
-                    setSubForm((f) => ({
-                      ...f,
-                      slug: generateSlug(e.target.value),
-                    }))
-                  }
-                  className={`${inputCls} font-mono`}
-                  required
-                  placeholder="mobile-apps"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={subSaving || !subForm.category_id}
-              className="w-full py-3 rounded-xl border border-border text-foreground font-semibold text-sm hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50 transition-all cursor-pointer"
-            >
-              {subSaving ? "Adding..." : "+ Add Subcategory"}
-            </button>
-          </form>
         </div>
+
+        <button
+          type="button"
+          onClick={openCreateModal}
+          className="px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground font-bold text-xs hover:shadow-sm transition-all inline-flex items-center gap-2 cursor-pointer shrink-0"
+        >
+          <Plus size={14} /> Add Category
+        </button>
       </div>
 
-      {/* RIGHT: List */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-lg font-display font-bold text-foreground">
-            Categories ({categories.length})
-          </h2>
-        </div>
+      {/* Search Toolbar */}
+      <div className="w-full sm:w-80 relative">
+        <input
+          type="text"
+          value={globalFilter ?? ""}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          placeholder="Filter categories..."
+          className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-border bg-card text-foreground placeholder:text-muted-foreground/40 text-xs font-mono focus:outline-none focus:border-primary/60"
+        />
+        <Search
+          size={14}
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none"
+        />
+      </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-muted-foreground">
+      {/* TanStack Table Card */}
+      <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 text-center text-xs font-mono text-muted-foreground flex items-center justify-center gap-2">
+            <Loader2 size={16} className="animate-spin text-primary" />
             Loading categories...
           </div>
-        ) : categories.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground">
-            No categories yet.
-          </div>
         ) : (
-          <div className="divide-y divide-border max-h-[75vh] overflow-y-auto">
-            {categories.map((cat) => {
-              const Icon = iconMap[cat.icon] || Layers;
-              const subs = subcategories.filter(
-                (s) => s.category_id === cat.id
-              );
-
-              return (
-                <div key={cat.id} className="p-5 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center"
-                        style={{
-                          background: `${cat.color}15`,
-                          border: `1px solid ${cat.color}30`,
-                        }}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id} className="border-b border-border bg-muted/40 font-mono">
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
                       >
-                        <Icon size={18} style={{ color: cat.color }} />
-                      </div>
-                      <div>
-                        <div className="font-bold text-foreground">
-                          {cat.name}
-                        </div>
-                        <div className="text-xs text-muted-foreground font-mono">
-                          {cat.slug}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(cat)}
-                        className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                        className="px-3 py-1.5 rounded-lg border border-destructive/30 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Subcategories list */}
-                  {subs.length > 0 && (
-                    <div className="pl-12 flex flex-wrap gap-2">
-                      {subs.map((s) => (
-                        <span
-                          key={s.id}
-                          className="inline-flex items-center gap-1.5 text-xs bg-muted/60 text-muted-foreground px-2.5 py-1 rounded-lg border border-border/50 group"
-                        >
-                          {s.name}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSubcategory(s.id)}
-                            className="text-muted-foreground/60 hover:text-destructive transition-colors ml-0.5"
+                        {header.isPlaceholder ? null : (
+                          <div
+                            {...{
+                              className: header.column.getCanSort()
+                                ? "cursor-pointer select-none flex items-center gap-1"
+                                : "",
+                              onClick: header.column.getToggleSortingHandler(),
+                            }}
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                            {header.column.getCanSort() && (
+                              <ArrowUpDown size={12} className="text-muted-foreground/50" />
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody className="divide-y divide-border">
+                {table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3.5">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      {/* ── Add / Edit Category Modal ── */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-display font-bold text-foreground">
+                {editingCategory ? "Edit Category" : "New Category"}
+              </h3>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="p-1 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-mono text-muted-foreground block mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., UI/UX Kits"
+                  className={inputClass}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-mono text-muted-foreground block mb-1">
+                  Slug (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="e.g., ui-ux-kits"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-mono text-muted-foreground block mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Design systems and high-converting UI components..."
+                  className={`${inputClass} resize-none`}
+                />
+              </div>
+
+              {/* Subcategories Editor */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <label className="text-xs font-mono text-muted-foreground block">
+                  Nested Subcategories
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                    placeholder="New subcategory name..."
+                    className={inputClass}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addSubcategory();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={addSubcategory}
+                    className="px-3 py-2.5 rounded-2xl bg-primary text-primary-foreground font-bold text-xs font-mono shrink-0 cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {subcategories.map((sub, i) => (
+                    <span
+                      key={i}
+                      className="px-2.5 py-1 rounded-xl text-xs font-mono bg-muted border border-border flex items-center gap-1.5 text-foreground"
+                    >
+                      {sub.name}
+                      <button
+                        type="button"
+                        onClick={() => removeSubcategory(i)}
+                        className="text-muted-foreground hover:text-destructive cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2.5 rounded-2xl border border-border text-xs font-mono hover:bg-muted cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="px-5 py-2.5 rounded-2xl bg-primary text-primary-foreground font-bold text-xs font-mono hover:shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  {createMutation.isPending || updateMutation.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : null}
+                  {editingCategory ? "Update Category" : "Create Category"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-destructive/40 bg-card p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-display font-bold text-foreground">
+              Delete Category?
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Are you sure you want to permanently delete this category? Products in this category may become unassigned.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-mono hover:bg-muted cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteMutation.mutate(deleteConfirmId)}
+                disabled={deleteMutation.isPending}
+                className="px-4 py-2 rounded-xl bg-destructive text-destructive-foreground font-bold text-xs font-mono hover:opacity-90 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {deleteMutation.isPending && <Loader2 size={12} className="animate-spin" />}
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default CategoriesAdminPanel;

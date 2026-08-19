@@ -29,6 +29,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "azaiza-design-studio.s3.us-east-1.amazonaws.com",
+      },
+      {
+        protocol: "https",
         hostname: "**.amazonaws.com",
       },
       {

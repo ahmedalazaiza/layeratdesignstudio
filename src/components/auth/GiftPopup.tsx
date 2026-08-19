@@ -8,9 +8,9 @@ const GIFT_KEY = "ld_gift_popup";
 const GIFT_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 interface GiftPopupProps {
-  authUser: AuthUser | null;
-  onSuccess: (user: AuthUser) => void;
-  scrollReady: boolean;
+  authUser?: any;
+  onSuccess?: (user?: any) => void;
+  scrollReady?: boolean;
 }
 
 export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) {
@@ -171,7 +171,9 @@ export function GiftPopup({ authUser, onSuccess, scrollReady }: GiftPopupProps) 
           createdAt: data.user.created_at || new Date().toISOString(),
           isVerified,
         };
-        onSuccess(newUser);
+        if (onSuccess) {
+          onSuccess(newUser);
+        }
       }
 
       // DO NOT DOWNLOAD FILE HERE! Show success verification prompt only.

@@ -5,6 +5,8 @@ import { Providers } from "@/components/providers";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { AuthModal } from "@/components/auth/AuthModal";
+import { EmailVerificationModal } from "@/components/auth/EmailVerificationModal";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -80,6 +82,10 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import { RouteProgressBar } from "@/components/layout/RouteProgressBar";
+import { Suspense } from "react";
+
 export default function RootLayout({
   children,
 }: {
@@ -93,12 +99,18 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary flex flex-col font-sans">
         <Providers>
+          <Suspense fallback={null}>
+            <RouteProgressBar />
+          </Suspense>
+          <OfflineBanner />
           <ScrollToTop />
           <Navbar />
           <main className="flex-1 w-full pt-16 sm:pt-20 flex flex-col">
             {children}
           </main>
           <Footer />
+          <AuthModal />
+          <EmailVerificationModal />
         </Providers>
       </body>
     </html>

@@ -6,47 +6,31 @@ import { Mail, RefreshCw, Sparkles, Check } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@/types/api";
 
+import { useAuth } from "@/hooks/useAuth";
+
 interface UnverifiedEmailBannerProps {
-  authUser: User | any | null;
+  authUser?: User | any | null;
   onVerificationSuccess?: () => void;
 }
 
 export function UnverifiedEmailBanner({
-  authUser,
+  authUser: propUser,
   onVerificationSuccess,
 }: UnverifiedEmailBannerProps) {
+  const {
+    authUser: contextUser,
+    requestEmailVerification,
+    openEmailVerifyModal,
+    refetchUser,
+  } = useAuth();
+
+  const authUser = propUser || contextUser;
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(false);
-  const notifiedRef = useRef(false);
 
   const isUserVerified = Boolean(
     authUser?.isVerified || authUser?.isEmailVerified
   );
-
-  // Auto-check on window focus
-  useEffect(() => {
-    if (!authUser || isUserVerified) return;
-
-    let isSubscribed = true;
-
-    const checkVerification = async () => {
-      if (!isSubscribed || notifiedRef.current) return;
-      try {
-        // Optional verification check hook
-        if (onVerificationSuccess) {
-          onVerificationSuccess();
-        }
-      } catch (err) {
-        console.error("Verification auto-check error:", err);
-      }
-    };
-
-    window.addEventListener("focus", checkVerification);
-    return () => {
-      isSubscribed = false;
-      window.removeEventListener("focus", checkVerification);
-    };
-  }, [authUser?._id || authUser?.id, isUserVerified, onVerificationSuccess]);
 
   // If no user or already verified, don't show banner
   if (!authUser || isUserVerified) {
@@ -56,17 +40,10 @@ export function UnverifiedEmailBanner({
   const handleManualCheck = async () => {
     try {
       setChecking(true);
-      if (onVerificationSuccess) {
-        onVerificationSuccess();
-      }
-      toast.info(
-        "Account pending verification. Please check the link sent to your email.",
-        {
-          description: `Check spam folder or click 'Resend Link' if you haven't received it at ${authUser.email}.`,
-        }
-      );
+      await refetchUser();
+      if (onVerificationSuccess) onVerificationSuccess();
     } catch {
-      toast.error("Failed to check status. Please try again.");
+      toast.error("Failed to refresh status. Please try again.");
     } finally {
       setChecking(false);
     }
@@ -76,9 +53,7 @@ export function UnverifiedEmailBanner({
     if (!authUser.email) return;
     try {
       setResending(true);
-      toast.success(
-        `Verification link requested for ${authUser.email}! Please check your inbox.`
-      );
+      await requestEmailVerification();
     } catch (err: any) {
       toast.error(err?.message || "Failed to resend verification link.");
     } finally {
@@ -103,38 +78,34 @@ export function UnverifiedEmailBanner({
               <Sparkles size={10} className="text-primary" /> Action Required
             </span>
             <p className="truncate text-xs text-foreground/80 dark:text-muted-foreground">
-              Please check your inbox (
+              Please verify your email (
               <span className="text-foreground font-bold font-mono">
                 {authUser.email}
               </span>
-              ) and verify your account to unlock all free downloads.
+              ) to unlock all free downloads and gifts.
             </p>
           </div>
 
           {/* Right / Actions */}
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={handleManualCheck}
-              disabled={checking}
-              title="Check if verified"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-background hover:bg-muted text-foreground border border-border hover:border-primary/50 font-mono font-bold text-[11px] transition-all cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={openEmailVerifyModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary text-primary-foreground font-mono font-bold text-[11px] transition-all hover:shadow-sm cursor-pointer"
             >
-              {checking ? (
-                <RefreshCw size={11} className="animate-spin text-primary" />
-              ) : (
-                <Check size={11} className="text-primary font-bold" />
-              )}
-              <span>{checking ? "Checking..." : "I've Verified"}</span>
+              <Check size={11} className="font-bold" />
+              <span>Enter Code</span>
             </button>
 
             <button
+              type="button"
               onClick={handleResend}
               disabled={resending}
               title="Resend verification email"
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 font-mono font-bold text-[11px] transition-all cursor-pointer disabled:opacity-50"
             >
               <Mail size={11} />
-              <span>{resending ? "Sending..." : "Resend Link"}</span>
+              <span>{resending ? "Sending..." : "Resend"}</span>
             </button>
           </div>
         </div>

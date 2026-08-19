@@ -29,7 +29,9 @@ import { UsersAdminPanel } from "./UsersAdminPanel";
 import { ReviewsAdminPanel } from "./ReviewsAdminPanel";
 import { SiteContentAdminPanel } from "./SiteContentAdminPanel";
 import { GiftSettingsPanel } from "./GiftSettingsPanel";
+import { TagsAdminPanel } from "./TagsAdminPanel";
 import { LayeratLogo, LayeratIconSvg } from "../brand/LayeratLogo";
+import { Hash } from "lucide-react";
 import type { Page, AuthUser, Category, Product } from "../../types";
 
 export type AdminTab =
@@ -38,6 +40,7 @@ export type AdminTab =
   | "products"
   | "reviews"
   | "categories"
+  | "tags"
   | "publishers"
   | "users"
   | "cms"
@@ -105,6 +108,7 @@ export function AdminDashboardLayout({
     { id: "products", label: "Free Resources", icon: Package },
     { id: "reviews", label: "Product Reviews", icon: Star },
     { id: "categories", label: "Categories", icon: Layers },
+    { id: "tags", label: "Tags & Keywords", icon: Hash },
     { id: "publishers", label: "Publisher Requests", icon: FileCheck },
     { id: "users", label: "Users & Roles", icon: Users },
     { id: "cms", label: "Site Pages CMS", icon: Edit3 },
@@ -313,6 +317,8 @@ export function AdminDashboardLayout({
               {activeTab === "categories" && (
                 <CategoriesAdminPanel categories={categories} />
               )}
+
+              {activeTab === "tags" && <TagsAdminPanel />}
 
               {activeTab === "publishers" && <PublisherApplicationsPanel />}
 

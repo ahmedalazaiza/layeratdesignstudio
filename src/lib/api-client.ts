@@ -33,11 +33,28 @@ export function getRefreshToken(): string | undefined {
   return Cookies.get(REFRESH_TOKEN_KEY);
 }
 
-export function setAuthTokens(accessToken: string, refreshToken?: string): void {
+export function setAuthTokens(
+  tokenOrTokens: string | { accessToken: string; refreshToken?: string },
+  refreshTokenArg?: string
+): void {
   if (typeof window === "undefined") return;
-  Cookies.set(ACCESS_TOKEN_KEY, accessToken, COOKIE_OPTIONS);
-  if (refreshToken) {
-    Cookies.set(REFRESH_TOKEN_KEY, refreshToken, {
+
+  let access: string;
+  let refresh: string | undefined;
+
+  if (typeof tokenOrTokens === "object" && tokenOrTokens !== null) {
+    access = tokenOrTokens.accessToken;
+    refresh = tokenOrTokens.refreshToken;
+  } else {
+    access = tokenOrTokens;
+    refresh = refreshTokenArg;
+  }
+
+  if (access) {
+    Cookies.set(ACCESS_TOKEN_KEY, access, COOKIE_OPTIONS);
+  }
+  if (refresh) {
+    Cookies.set(REFRESH_TOKEN_KEY, refresh, {
       ...COOKIE_OPTIONS,
       expires: 30, // 30 days for refresh token
     });

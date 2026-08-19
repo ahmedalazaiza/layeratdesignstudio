@@ -70,6 +70,7 @@ export interface User {
   avatar?: string;
   role: UserRole | string;
   isEmailVerified?: boolean;
+  isVerified?: boolean;
   financialDetails?: UserFinancialDetails;
   statistics?: UserStatistics;
   provider?: "local" | "google" | "github" | string;
@@ -117,6 +118,7 @@ export interface Category {
   icon?: any;
   color?: string;
   subcategories?: SubCategory[];
+  includedFiles?: string[];
   productCount?: number;
   featured?: boolean;
   order?: number;
@@ -277,9 +279,11 @@ export interface RefreshTokenResponse {
 }
 
 export interface LoginPayload {
-  email: string;
+  emailOrUserName: string;
+  email?: string;
   password?: string;
   code?: string;
+  rememberMe?: boolean;
 }
 
 export interface RegisterPayload {
@@ -302,4 +306,27 @@ export interface UpdateProfilePayload {
     figma?: string;
     linkedin?: string;
   };
+}
+
+export interface ProductQueryParams {
+  query?: string;
+  category?: string;
+  subCategory?: string;
+  tag?: string;
+  sort?: "newest" | "popular" | "downloads" | "rating" | "price_asc" | "price_desc" | string;
+  page?: number;
+  limit?: number;
+  isFree?: boolean;
+}
+
+export interface ProductDownloadResponse {
+  downloadLink: string;
+  expiresIn?: number;
+  fileName?: string;
+}
+
+export interface RateProductPayload {
+  productId: string;
+  rating: number;
+  comment?: string;
 }
