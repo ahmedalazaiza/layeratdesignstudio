@@ -149,7 +149,7 @@ export function Hero({ onSearch, onNavigate, onAuthOpen }: HeroProps) {
 
               {/* Quick category pills (Wrapped cleanly) */}
               <div className="flex flex-wrap gap-2 mt-3">
-                {quickCategories.map((cat) => (
+                {quickCategories.map((cat: string) => (
                   <button
                     key={cat}
                     onClick={() => {

@@ -76,8 +76,8 @@ export function FeaturedProducts({
                 wishlist={wishlist}
                 isWishlisted={
                   wishlist
-                    ? wishlist.includes(product.id)
-                    : Boolean(authUser?.wishlist?.includes(product.id))
+                    ? wishlist.includes(product.id || product._id || "")
+                    : Boolean(authUser?.wishlist?.includes(product.id || product._id || ""))
                 }
               />
             </motion.div>

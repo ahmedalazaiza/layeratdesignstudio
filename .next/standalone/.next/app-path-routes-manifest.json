@@ -1,0 +1,12 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/browse/page": "/browse",
+  "/about/page": "/about",
+  "/publisher/page": "/publisher",
+  "/privacy/page": "/privacy",
+  "/page": "/",
+  "/favorites/page": "/favorites",
+  "/team/page": "/team",
+  "/product/[slug]/page": "/product/[slug]",
+  "/terms/page": "/terms"
+}

@@ -1,5 +1,7 @@
+"use client";
+
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import {
   ChevronLeft,
   Dribbble,
@@ -9,76 +11,74 @@ import {
   Figma,
 } from "lucide-react";
 import { LayeratLogo } from "../brand/LayeratLogo";
-import type { Page, Category } from "../../types";
+import type { Category } from "@/types/api";
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-
-function Footer({
-  onNavigate,
-  categories,
-  onCategoryClick,
-}: {
-  onNavigate?: (p: Page) => void;
-  categories: Category[];
+interface FooterProps {
+  categories?: Category[];
   onCategoryClick?: (categoryId: string) => void;
-}) {
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  onNavigate?: (p: any) => void;
+}
 
-  const footerData = (() => {
-    try {
-      const saved = localStorage.getItem("ld_custom_footer");
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      tagline:
-        "Premium Figma resources built by designers, for designers. Elevate your creative workflow with 100% free kits.",
-      badgeText: "100% Free Community Edition",
-      figmaUrl: "https://figma.com/@layerat",
-      dribbbleUrl: "https://dribbble.com",
-      twitterUrl: "https://x.com",
-      linkedinUrl: "https://linkedin.com",
-      githubUrl: "https://github.com",
-      contactEmail: "support@layerat.com",
-      copyrightText: "Layerat Design Studio. All rights reserved.",
-    };
-  })();
+export function Footer({
+  categories = [],
+  onCategoryClick,
+  onNavigate,
+}: FooterProps) {
+  const scrollToTop = () => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const footerData = {
+    tagline:
+      "Premium Figma resources built by designers, for designers. Elevate your creative workflow with 100% free kits.",
+    badgeText: "100% Free Community Edition",
+    figmaUrl: "https://figma.com/@layerat",
+    dribbbleUrl: "https://dribbble.com",
+    twitterUrl: "https://x.com",
+    linkedinUrl: "https://linkedin.com",
+    githubUrl: "https://github.com",
+    contactEmail: "support@layerat.com",
+    copyrightText: "Layerat Design Studio. All rights reserved.",
+  };
 
   const socialLinks = [
     {
       label: "Figma Community",
-      href: footerData.figmaUrl || "https://figma.com/@layerat",
+      href: footerData.figmaUrl,
       icon: Figma,
     },
     {
       label: "Dribbble",
-      href: footerData.dribbbleUrl || "https://dribbble.com",
+      href: footerData.dribbbleUrl,
       icon: Dribbble,
     },
     {
       label: "Twitter / X",
-      href: footerData.twitterUrl || "https://x.com",
+      href: footerData.twitterUrl,
       icon: Twitter,
     },
     {
       label: "LinkedIn",
-      href: footerData.linkedinUrl || "https://linkedin.com",
+      href: footerData.linkedinUrl,
       icon: Linkedin,
     },
     {
       label: "GitHub",
-      href: footerData.githubUrl || "https://github.com",
+      href: footerData.githubUrl,
       icon: Github,
     },
   ];
 
   return (
     <footer className="border-t border-border bg-card/40 backdrop-blur-md">
-      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-14">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-14 max-w-7xl mx-auto">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <Link
-              to="/"
+              href="/"
               onClick={scrollToTop}
               className="mb-3 inline-flex items-center hover:opacity-85 transition-opacity"
             >
@@ -113,29 +113,69 @@ function Footer({
 
           {/* Categories */}
           <div>
-            <h4 className="text-sm font-display font-bold text-foreground mb-4">
+            <h4 className="text-sm font-semibold text-foreground mb-4">
               Categories
             </h4>
             <ul className="space-y-2.5">
-              {categories.slice(0, 6).map((cat) => (
-                <li key={cat.id}>
-                  <Link
-                    to={`/browse?category=${encodeURIComponent(cat.slug || cat.id)}`}
-                    onClick={() => {
-                      if (onCategoryClick) onCategoryClick(cat.id);
-                    }}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
-                  >
-                    {cat.name}
-                  </Link>
-                </li>
-              ))}
+              {categories.slice(0, 6).map((cat) => {
+                const catId = cat._id || cat.id || "";
+                const catSlug = cat.slug || catId;
+                return (
+                  <li key={catId || cat.name}>
+                    <Link
+                      href={`/browse?category=${encodeURIComponent(catSlug)}`}
+                      onClick={() => {
+                        if (onCategoryClick && catId) onCategoryClick(catId);
+                      }}
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
+                    >
+                      {cat.name}
+                    </Link>
+                  </li>
+                );
+              })}
+              {categories.length === 0 && (
+                <>
+                  <li>
+                    <Link
+                      href="/browse?category=ui-kits"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors block"
+                    >
+                      UI Kits
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/browse?category=design-systems"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors block"
+                    >
+                      Design Systems
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/browse?category=wireframes"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors block"
+                    >
+                      Wireframe Kits
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/browse?category=icons"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors block"
+                    >
+                      Icons & Illustrations
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 
           {/* Quick links */}
           <div>
-            <h4 className="text-sm font-display font-bold text-foreground mb-4">
+            <h4 className="text-sm font-semibold text-foreground mb-4">
               Marketplace
             </h4>
             <ul className="space-y-2.5">
@@ -147,7 +187,7 @@ function Footer({
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link
-                    to={to}
+                    href={to}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {label}
@@ -159,7 +199,7 @@ function Footer({
 
           {/* Company & Legal */}
           <div>
-            <h4 className="text-sm font-display font-bold text-foreground mb-4">
+            <h4 className="text-sm font-semibold text-foreground mb-4">
               Company & Legal
             </h4>
             <ul className="space-y-2.5">
@@ -172,7 +212,7 @@ function Footer({
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link
-                    to={to}
+                    href={to}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors text-left block"
                   >
                     {label}
@@ -211,4 +251,4 @@ function Footer({
   );
 }
 
-export { Footer };
+export default Footer;

@@ -613,7 +613,7 @@ export function ProfilePage({
                               key={i}
                               size={10}
                               className={
-                                i < Math.round(p.rating)
+                                i < Math.round(p.rating || 0)
                                   ? "text-primary fill-primary"
                                   : "text-border"
                               }

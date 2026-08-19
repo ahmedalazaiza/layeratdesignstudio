@@ -501,12 +501,12 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
 
   const categoryOptions = [
     { value: "", label: "Select Category" },
-    ...categories.map((c) => ({ value: c.id, label: c.name })),
+    ...categories.map((c) => ({ value: c.id || c._id || "", label: c.name })),
   ];
 
   const subcategoryOptions = [
     { value: "", label: "Select Subcategory" },
-    ...subcategories.map((s) => ({ value: s.id, label: s.name })),
+    ...subcategories.map((s) => ({ value: s.id || s._id || "", label: s.name })),
   ];
 
   const filteredProducts = products.filter((p) => {
@@ -1136,7 +1136,7 @@ export function ProductsAdminPanel({ categories }: ProductsAdminPanelProps) {
                 onChange={(val) => setSelectedCategoryFilter(val)}
                 options={[
                   { value: "all", label: "All Categories" },
-                  ...categories.map((c) => ({ value: c.id, label: c.name })),
+                  ...categories.map((c) => ({ value: c.id || c._id || "", label: c.name })),
                 ]}
                 className="w-40 text-xs font-mono"
               />

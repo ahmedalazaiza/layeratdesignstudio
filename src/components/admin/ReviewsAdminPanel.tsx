@@ -229,7 +229,7 @@ export function ReviewsAdminPanel({
             onChange={(val) => setProductFilter(val)}
             options={[
               { value: "all", label: "All Products" },
-              ...products.map((p) => ({ value: p.id, label: p.title })),
+              ...products.map((p) => ({ value: p.id || p._id || "", label: p.title })),
             ]}
             className="w-56 text-xs font-mono"
           />

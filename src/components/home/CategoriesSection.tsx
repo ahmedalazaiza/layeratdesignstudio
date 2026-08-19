@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Layers } from "lucide-react";
 import type { Category } from "../../types";
 
 interface CategoriesSectionProps {
@@ -37,23 +37,29 @@ export function CategoriesSection({
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {categories.map((cat, i) => (
-            <motion.button
-              key={cat.id}
-              initial={{ opacity: 0, y: 40 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              onClick={() => onCategoryClick(cat.id)}
-              className="group relative text-left p-7 rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_0_60px_rgba(82,51,253,0.12)] transition-all duration-300 overflow-hidden cursor-pointer"
-            >
+          {categories.map((cat, i) => {
+            const catId = cat.id || cat._id || "";
+            return (
+              <motion.button
+                key={catId || i}
+                initial={{ opacity: 0, y: 40 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                onClick={() => onCategoryClick(catId)}
+                className="group relative text-left p-7 rounded-3xl border border-border bg-card hover:border-primary/40 hover:shadow-[0_8px_40px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_0_60px_rgba(82,51,253,0.12)] transition-all duration-300 overflow-hidden cursor-pointer"
+              >
               <div
                 className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110"
                 style={{
-                  background: `${cat.color}18`,
-                  border: `1px solid ${cat.color}35`,
+                  background: `${cat.color || "#1a4d22"}18`,
+                  border: `1px solid ${cat.color || "#1a4d22"}35`,
                 }}
               >
-                <cat.icon size={22} style={{ color: cat.color }} />
+                {typeof cat.icon === "function" || typeof cat.icon === "object" ? (
+                  React.createElement(cat.icon as any, { size: 22, style: { color: cat.color || "#1a4d22" } })
+                ) : (
+                  <Layers size={22} style={{ color: cat.color || "#1a4d22" }} />
+                )}
               </div>
 
               <h3 className="font-display font-bold text-foreground text-lg mb-2 group-hover:text-primary transition-colors flex items-center justify-between">
@@ -65,17 +71,20 @@ export function CategoriesSection({
               </h3>
 
               <div className="space-y-1">
-                {cat.subcategories.slice(0, 3).map((sub) => (
-                  <p
-                    key={sub.id}
-                    className="text-xs text-muted-foreground truncate"
-                  >
-                    · {sub.name}
-                  </p>
-                ))}
-                {cat.subcategories.length > 3 && (
+                {(cat.subcategories || []).slice(0, 3).map((sub) => {
+                  const subId = sub.id || (sub as any)._id || sub.slug;
+                  return (
+                    <p
+                      key={subId}
+                      className="text-xs text-muted-foreground truncate"
+                    >
+                      · {sub.name}
+                    </p>
+                  );
+                })}
+                {(cat.subcategories || []).length > 3 && (
                   <p className="text-[11px] text-primary font-mono font-medium pt-1">
-                    +{cat.subcategories.length - 3} more
+                    +{(cat.subcategories || []).length - 3} more
                   </p>
                 )}
               </div>
@@ -87,7 +96,8 @@ export function CategoriesSection({
                 }}
               />
             </motion.button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

@@ -1,19 +1,14 @@
+"use client";
+
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
-  Sparkles,
   Layers,
-  Layout,
-  FileText,
-  Package,
-  Smartphone,
   CheckCircle2,
-  ExternalLink,
 } from "lucide-react";
-import type { Category, Subcategory } from "../../types";
+import type { Category, SubCategory } from "@/types/api";
 
-// Subcategory meta information for the visual featured cards
 const SUBCATEGORY_DESCRIPTIONS: Record<
   string,
   { desc: string; badge?: string; visualBg?: string }
@@ -99,15 +94,14 @@ export function CategoryMegaMenu({
 }: CategoryMegaMenuProps) {
   if (!isOpen) return null;
 
-  const Icon = category.icon || Layers;
+  const categoryId = category._id || category.id || "";
   const subcategories = category.subcategories || [];
 
-  // Top 2-3 featured subcategories for visual cards on the left
+  // Top 3 featured subcategories
   const featuredSubcats = subcategories.slice(0, 3);
-  // Remaining or all subcategories for directory columns on the right
   const directorySubcats = subcategories;
 
-  // Split into 2 columns for the directory list
+  // Split into 2 columns
   const midpoint = Math.ceil(directorySubcats.length / 2);
   const col1 = directorySubcats.slice(0, midpoint);
   const col2 = directorySubcats.slice(midpoint);
@@ -128,22 +122,22 @@ export function CategoryMegaMenu({
             {/* Ambient category glow */}
             <div
               className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-20"
-              style={{ backgroundColor: category.color }}
+              style={{ backgroundColor: category.color || "#1a4d22" }}
             />
 
-            {/* Mega Menu Layout: Left Featured Visual Cards / Right Subcategories Directory */}
+            {/* Mega Menu Layout */}
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* LEFT: Featured Visual Cards (5 cols) */}
+              {/* LEFT: Featured Visual Cards */}
               <div className="lg:col-span-5 space-y-3">
                 <div className="flex items-center gap-2 mb-1 px-1">
                   <div
                     className="w-6 h-6 rounded-lg flex items-center justify-center"
                     style={{
-                      backgroundColor: `${category.color}20`,
-                      color: category.color,
+                      backgroundColor: `${category.color || "#1a4d22"}20`,
+                      color: category.color || "#1a4d22",
                     }}
                   >
-                    <Icon size={14} />
+                    <Layers size={14} />
                   </div>
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
                     Featured in {category.name}
@@ -152,17 +146,19 @@ export function CategoryMegaMenu({
 
                 <div className="space-y-2.5">
                   {featuredSubcats.map((subcat) => {
-                    const meta = SUBCATEGORY_DESCRIPTIONS[subcat.id] || {
-                      desc: `Explore curated ${subcat.name.toLowerCase()} assets.`,
-                      badge: "Free",
-                      visualBg: "from-primary/15 to-transparent",
-                    };
+                    const subcatId = subcat._id || subcat.id || subcat.slug;
+                    const meta = SUBCATEGORY_DESCRIPTIONS[subcat.slug] ||
+                      SUBCATEGORY_DESCRIPTIONS[subcatId] || {
+                        desc: `Explore curated ${subcat.name.toLowerCase()} assets.`,
+                        badge: "Free",
+                        visualBg: "from-primary/15 to-transparent",
+                      };
 
                     return (
                       <button
-                        key={subcat.id}
+                        key={subcatId}
                         onClick={() => {
-                          onSelectCategory(category.id, subcat.id);
+                          onSelectCategory(categoryId, subcatId);
                           onClose();
                         }}
                         className={`w-full text-left p-3.5 rounded-2xl border border-border/60 hover:border-primary/50 bg-gradient-to-r ${meta.visualBg} hover:bg-primary/10 transition-all duration-200 group cursor-pointer relative overflow-hidden`}
@@ -170,7 +166,7 @@ export function CategoryMegaMenu({
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-display font-bold text-foreground text-sm group-hover:text-primary transition-colors">
+                              <h4 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">
                                 {subcat.name}
                               </h4>
                               {meta.badge && (
@@ -196,7 +192,7 @@ export function CategoryMegaMenu({
                 </div>
               </div>
 
-              {/* RIGHT: Subcategories Directory List (7 cols) */}
+              {/* RIGHT: Subcategories Directory List */}
               <div className="lg:col-span-7 flex flex-col justify-between h-full space-y-4 pl-0 lg:pl-4 lg:border-l lg:border-border/60">
                 <div>
                   <div className="flex items-center justify-between mb-3 px-1">
@@ -205,7 +201,7 @@ export function CategoryMegaMenu({
                     </span>
                     <button
                       onClick={() => {
-                        onSelectCategory(category.id, null);
+                        onSelectCategory(categoryId, null);
                         onClose();
                       }}
                       className="text-xs text-primary hover:underline font-mono font-bold cursor-pointer"
@@ -217,46 +213,52 @@ export function CategoryMegaMenu({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {/* Column 1 */}
                     <div className="space-y-1">
-                      {col1.map((subcat) => (
-                        <button
-                          key={subcat.id}
-                          onClick={() => {
-                            onSelectCategory(category.id, subcat.id);
-                            onClose();
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all flex items-center justify-between group cursor-pointer"
-                        >
-                          <span className="group-hover:translate-x-0.5 transition-transform">
-                            {subcat.name}
-                          </span>
-                          <ArrowRight
-                            size={12}
-                            className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0 ml-2"
-                          />
-                        </button>
-                      ))}
+                      {col1.map((subcat) => {
+                        const subcatId = subcat._id || subcat.id || subcat.slug;
+                        return (
+                          <button
+                            key={subcatId}
+                            onClick={() => {
+                              onSelectCategory(categoryId, subcatId);
+                              onClose();
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all flex items-center justify-between group cursor-pointer"
+                          >
+                            <span className="group-hover:translate-x-0.5 transition-transform">
+                              {subcat.name}
+                            </span>
+                            <ArrowRight
+                              size={12}
+                              className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0 ml-2"
+                            />
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* Column 2 */}
                     <div className="space-y-1">
-                      {col2.map((subcat) => (
-                        <button
-                          key={subcat.id}
-                          onClick={() => {
-                            onSelectCategory(category.id, subcat.id);
-                            onClose();
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all flex items-center justify-between group cursor-pointer"
-                        >
-                          <span className="group-hover:translate-x-0.5 transition-transform">
-                            {subcat.name}
-                          </span>
-                          <ArrowRight
-                            size={12}
-                            className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0 ml-2"
-                          />
-                        </button>
-                      ))}
+                      {col2.map((subcat) => {
+                        const subcatId = subcat._id || subcat.id || subcat.slug;
+                        return (
+                          <button
+                            key={subcatId}
+                            onClick={() => {
+                              onSelectCategory(categoryId, subcatId);
+                              onClose();
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all flex items-center justify-between group cursor-pointer"
+                          >
+                            <span className="group-hover:translate-x-0.5 transition-transform">
+                              {subcat.name}
+                            </span>
+                            <ArrowRight
+                              size={12}
+                              className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0 ml-2"
+                            />
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -269,7 +271,7 @@ export function CategoryMegaMenu({
                   </div>
                   <button
                     onClick={() => {
-                      onSelectCategory(category.id, null);
+                      onSelectCategory(categoryId, null);
                       onClose();
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold font-mono transition-colors cursor-pointer"
@@ -286,3 +288,5 @@ export function CategoryMegaMenu({
     </AnimatePresence>
   );
 }
+
+export default CategoryMegaMenu;

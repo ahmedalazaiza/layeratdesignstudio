@@ -82,8 +82,9 @@ export function generateSEOMetadata(route: RouteState, product?: Product | null)
           image,
           type: "product",
           keywords: [
-            product.title,
-            ...(Array.isArray(product.tags) ? product.tags : []),
+            ...(Array.isArray(product.tags)
+              ? product.tags.map((t) => (typeof t === "string" ? t : t.name || t.slug || ""))
+              : []),
             "free figma download",
             "ui kit",
             "figma template",

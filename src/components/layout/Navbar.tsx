@@ -1,4 +1,9 @@
+"use client";
+
 import React, { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Search,
@@ -8,7 +13,7 @@ import {
   Moon,
   Laptop,
   Heart,
-  User,
+  User as UserIcon,
   LogOut,
   ChevronDown,
   Layout,
@@ -21,7 +26,8 @@ import {
 import { UnverifiedEmailBanner } from "./UnverifiedEmailBanner";
 import { LayeratLogo } from "../brand/LayeratLogo";
 import { CategoryMegaMenu } from "./CategoryMegaMenu";
-import type { Page, AuthUser, Category } from "../../types";
+import { NotificationCenter } from "./NotificationCenter";
+import type { Page, User, Category } from "@/types/api";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -60,41 +66,45 @@ function useScrollY(enabled: boolean = true) {
   return scrollY;
 }
 
-interface NavbarProps {
-  isDark: boolean;
+export interface NavbarProps {
+  isDark?: boolean;
   themeMode?: ThemeMode;
   onThemeChange?: (mode: ThemeMode) => void;
   onToggle?: () => void;
-  page: Page;
-  onNavigate: (p: Page) => void;
-  authUser: AuthUser | null;
-  onAuthOpen: (mode: "login" | "register" | "forgot_password") => void;
-  onLogout: () => void;
-  onSearch: (q: string) => void;
-  wishlistCount: number;
-  categories: Category[];
-  onCategoryClick: (categoryId: string, subcategoryId?: string | null) => void;
-  activeCategoryId: string | null;
+  page?: Page;
+  onNavigate?: (p: Page) => void;
+  authUser?: User | null;
+  onAuthOpen?: (mode: "login" | "register" | "forgot_password") => void;
+  onLogout?: () => void;
+  onSearch?: (q: string) => void;
+  wishlistCount?: number;
+  categories?: Category[];
+  onCategoryClick?: (categoryId: string, subcategoryId?: string | null) => void;
+  activeCategoryId?: string | null;
   onVerificationSuccess?: () => void;
 }
 
 export function Navbar({
-  isDark,
+  isDark: propIsDark,
   themeMode = "system",
   onThemeChange,
   onToggle,
   page,
   onNavigate,
-  authUser,
+  authUser = null,
   onAuthOpen,
   onLogout,
   onSearch,
-  wishlistCount,
-  categories,
+  wishlistCount = 0,
+  categories = [],
   onCategoryClick,
-  activeCategoryId,
+  activeCategoryId = null,
   onVerificationSuccess,
 }: NavbarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
   const scrollY = useScrollY(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [guestThemeOpen, setGuestThemeOpen] = useState(false);
@@ -105,7 +115,14 @@ export function Navbar({
   const [mobileExpandedCats, setMobileExpandedCats] = useState<string[]>([]);
   const megaMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const isSolid = scrollY > 5 || page !== "home" || menuOpen || searchOpen || activeMegaMenuId !== null;
+
+  const isDark = resolvedTheme === "dark" || Boolean(propIsDark);
+  const isSolid =
+    scrollY > 5 ||
+    pathname !== "/" ||
+    menuOpen ||
+    searchOpen ||
+    activeMegaMenuId !== null;
 
   const handleMouseEnterCategory = (catId: string) => {
     if (megaMenuTimeoutRef.current) clearTimeout(megaMenuTimeoutRef.current);
@@ -125,7 +142,11 @@ export function Navbar({
 
   const handleSearch = () => {
     if (searchVal.trim()) {
-      onSearch(searchVal.trim());
+      if (onSearch) {
+        onSearch(searchVal.trim());
+      } else {
+        router.push(`/browse?search=${encodeURIComponent(searchVal.trim())}`);
+      }
       setSearchOpen(false);
       setSearchVal("");
       setMenuOpen(false);
@@ -165,7 +186,7 @@ export function Navbar({
 
   // Initials fallback for user avatar
   const initials = authUser
-    ? authUser.name
+    ? (authUser.displayName || authUser.userName || "User")
         .split(" ")
         .map((n) => n[0])
         .slice(0, 2)
@@ -173,763 +194,461 @@ export function Navbar({
         .toUpperCase()
     : "";
 
-  const isHomeActive = page === "home";
+  const isHomeActive = pathname === "/";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 pointer-events-auto">
-      {/* Unverified Email Top Banner (Stacks above Navbar, never overlaps) */}
+      {/* Unverified Email Top Banner */}
       <UnverifiedEmailBanner
         authUser={authUser}
         onVerificationSuccess={onVerificationSuccess}
       />
 
       <nav
-        className={`relative w-full transition-all duration-300 border-b ${
+        className={`w-full transition-all duration-300 ${
           isSolid
-            ? "bg-card/98 dark:bg-[#080c09]/98 backdrop-blur-2xl border-border/80 shadow-md shadow-black/5 dark:shadow-black/30"
-            : "bg-background/90 dark:bg-[#080c09]/90 backdrop-blur-xl border-transparent"
+            ? "bg-background/95 backdrop-blur-xl border-b border-border/80 shadow-md shadow-black/5"
+            : "bg-background/40 backdrop-blur-md border-b border-border/20"
         }`}
       >
-        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 flex items-center justify-between h-16 lg:h-20 gap-4">
-          {/* Left section: Brand Logo + Desktop Nav Links */}
-          <div className="flex items-center gap-4 xl:gap-7 flex-1 min-w-0">
-            {/* Brand Logo */}
-            <button
-              onClick={() => {
-                onNavigate("home");
-                setMenuOpen(false);
-              }}
-              className="shrink-0 hover:opacity-85 transition-opacity cursor-pointer flex items-center"
-              title="Layerat Design Studio"
+        <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 max-w-7xl mx-auto flex items-center justify-between h-16 sm:h-20 gap-3 sm:gap-6">
+          {/* Logo & Category Mega Menus */}
+          <div className="flex items-center gap-4 lg:gap-8">
+            <Link
+              href="/"
+              className="flex items-center gap-2 cursor-pointer group select-none shrink-0"
             >
-              <LayeratLogo isDark={isDark} height={28} className="h-6 sm:h-7.5 w-auto" />
-            </button>
+              <LayeratLogo height={32} className="h-8 w-auto" />
+            </Link>
 
-            {/* Desktop Nav links */}
-            <div className="hidden lg:flex items-center gap-1 xl:gap-1.5 flex-nowrap">
-              <button
-                onClick={() => onNavigate("home")}
-                className={`text-xs xl:text-sm whitespace-nowrap shrink-0 transition-colors px-2.5 xl:px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer ${
+            {/* Desktop Navigation Links & Mega Menus */}
+            <div className="hidden lg:flex items-center gap-1">
+              <Link
+                href="/"
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
                   isHomeActive
-                    ? "text-primary font-bold bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
-                <span className="whitespace-nowrap">Home</span>
-                <span
-                  className={`absolute -bottom-0.5 left-2.5 right-2.5 xl:left-3 xl:right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                    isHomeActive
-                      ? "scale-x-100"
-                      : "scale-x-0 group-hover:scale-x-100"
-                  }`}
-                />
-              </button>
+                Home
+              </Link>
 
-              {categories.map((cat) => {
-                const isActive = page === "browse" && activeCategoryId === cat.id;
-                const isMenuOpen = activeMegaMenuId === cat.id;
+              {/* Categories Navigation with Dropdowns */}
+              {categories.slice(0, 4).map((cat) => {
+                const catId = cat._id || cat.id || cat.slug;
+                const isActive = activeCategoryId === catId;
+                const isMegaOpen = activeMegaMenuId === catId;
 
                 return (
                   <div
-                    key={cat.id}
+                    key={catId}
                     className="relative"
-                    onMouseEnter={() => handleMouseEnterCategory(cat.id)}
+                    onMouseEnter={() => handleMouseEnterCategory(catId)}
                     onMouseLeave={handleMouseLeaveCategory}
                   >
-                    <button
+                    <Link
+                      href={`/browse?category=${encodeURIComponent(cat.slug || catId)}`}
                       onClick={() => {
-                        if (activeMegaMenuId === cat.id) {
-                          setActiveMegaMenuId(null);
-                        } else {
-                          setActiveMegaMenuId(cat.id);
-                        }
+                        if (onCategoryClick) onCategoryClick(catId, null);
+                        setActiveMegaMenuId(null);
                       }}
-                      className={`text-xs xl:text-sm whitespace-nowrap shrink-0 transition-colors px-2.5 xl:px-3 py-1.5 rounded-xl hover:bg-primary/10 relative group cursor-pointer flex items-center gap-1 xl:gap-1.5 ${
-                        isActive || isMenuOpen
-                          ? "text-primary font-bold bg-primary/10"
-                          : "text-muted-foreground hover:text-foreground"
+                      className={`px-3.5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isActive || isMegaOpen
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       }`}
                     >
-                      <span className="whitespace-nowrap">{cat.name}</span>
+                      <span>{cat.name}</span>
                       <ChevronDown
-                        size={13}
-                        className={`transition-transform duration-200 opacity-70 group-hover:opacity-100 shrink-0 ${
-                          isMenuOpen ? "rotate-180 text-primary opacity-100" : ""
+                        size={12}
+                        className={`transition-transform duration-200 ${
+                          isMegaOpen ? "rotate-180 text-primary" : "opacity-60"
                         }`}
                       />
-                      <span
-                        className={`absolute -bottom-0.5 left-2.5 right-2.5 xl:left-3 xl:right-3 h-0.5 bg-primary transition-transform duration-300 ${
-                          isActive
-                            ? "scale-x-100"
-                            : "scale-x-0 group-hover:scale-x-100"
-                        }`}
+                    </Link>
+
+                    {/* Mega Menu Dropdown */}
+                    <div className="absolute top-full left-0 pt-2 z-50">
+                      <CategoryMegaMenu
+                        category={cat}
+                        isOpen={isMegaOpen}
+                        onClose={() => setActiveMegaMenuId(null)}
+                        onMouseEnter={() => handleMouseEnterCategory(catId)}
+                        onMouseLeave={handleMouseLeaveCategory}
+                        onSelectCategory={(cId, subId) => {
+                          if (onCategoryClick) {
+                            onCategoryClick(cId, subId);
+                          } else {
+                            const url = subId
+                              ? `/browse?category=${encodeURIComponent(cId)}&subcategory=${encodeURIComponent(subId)}`
+                              : `/browse?category=${encodeURIComponent(cId)}`;
+                            router.push(url);
+                          }
+                          setActiveMegaMenuId(null);
+                        }}
                       />
-                    </button>
+                    </div>
                   </div>
                 );
               })}
+
+              <Link
+                href="/browse"
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all ${
+                  pathname === "/browse" && !activeCategoryId
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                Browse All
+              </Link>
             </div>
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center justify-end gap-2 xl:gap-2.5 shrink-0 ml-auto">
-          {/* Search toggle (desktop) */}
-          <div className="hidden lg:block relative">
-            <AnimatePresence>
-              {searchOpen ? (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 260, opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="flex items-center overflow-hidden"
-                >
-                  <div className="flex items-center border border-border rounded-xl bg-card overflow-hidden w-full shadow-md">
-                    <Search
-                      size={14}
-                      className="ml-3 text-muted-foreground shrink-0"
-                    />
-                    <input
-                      autoFocus
-                      value={searchVal}
-                      onChange={(e) => setSearchVal(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                      placeholder="Search free resources..."
-                      className="flex-1 px-3 py-2 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => setSearchOpen(false)}
-                      className="mr-2 p-1 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                </motion.div>
-              ) : (
+          {/* Right Actions: Search, Wishlist, NotificationCenter, Theme, Auth Profile */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Search Input Bar (Desktop) */}
+            <div className="hidden md:flex items-center relative w-44 lg:w-60">
+              <input
+                type="text"
+                placeholder="Search UI kits, icons..."
+                value={searchVal}
+                onChange={(e) => setSearchVal(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="w-full h-9 pl-9 pr-8 text-xs bg-muted/60 hover:bg-muted/80 focus:bg-background border border-border/70 rounded-full outline-none focus:border-primary/50 transition-all text-foreground placeholder:text-muted-foreground"
+              />
+              <Search
+                size={14}
+                className="absolute left-3 text-muted-foreground pointer-events-none"
+              />
+              {searchVal && (
                 <button
-                  onClick={() => setSearchOpen(true)}
-                  aria-label="Search"
-                  className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card hover:border-primary/50 hover:bg-primary/10 transition-all duration-300 cursor-pointer"
+                  onClick={() => setSearchVal("")}
+                  className="absolute right-2.5 text-muted-foreground hover:text-foreground"
                 >
-                  <Search size={16} className="text-muted-foreground" />
+                  <X size={12} />
                 </button>
               )}
-            </AnimatePresence>
-          </div>
+            </div>
 
-          {/* Favorites */}
-          <button
-            onClick={() => onNavigate("favorites")}
-            aria-label="Saved resources"
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300 cursor-pointer ${
-              page === "favorites"
-                ? "border-primary/50 bg-primary/10"
-                : "border-border bg-card hover:border-primary/50 hover:bg-primary/10"
-            }`}
-          >
-            <Heart
-              size={16}
-              className={
-                page === "favorites"
-                  ? "text-primary fill-current"
-                  : "text-muted-foreground"
-              }
-            />
-            {wishlistCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center leading-none">
-                {wishlistCount > 9 ? "9+" : wishlistCount}
-              </span>
-            )}
-          </button>
-
-          {/* Quick Access Admin Console Button */}
-          {isAdmin && (
+            {/* Mobile Search Icon */}
             <button
-              onClick={() => onNavigate("admin")}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary text-xs font-bold font-mono hover:bg-primary/20 hover:border-primary transition-all duration-200 cursor-pointer shadow-sm"
-              title="Open Layerat Studio Dashboard"
+              onClick={() => setSearchOpen(!searchOpen)}
+              aria-label="Search"
+              className="md:hidden w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground"
             >
-              <ShieldCheck size={14} className="text-primary" />
-              <span>Studio Console</span>
+              <Search size={16} />
             </button>
-          )}
 
-          {/* Auth / User Profile */}
-          {authUser ? (
-            <div className="relative hidden md:block" ref={profileRef}>
-              <button
-                onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/40 transition-all duration-200 cursor-pointer"
-              >
-                {authUser.avatar ? (
-                  <img
-                    src={authUser.avatar}
-                    alt={authUser.name}
-                    className="w-6 h-6 rounded-full object-cover border border-primary/30 shrink-0"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">
-                    {initials}
-                  </div>
-                )}
-                <span className="text-sm font-medium text-foreground max-w-[90px] truncate">
-                  {authUser.name.split(" ")[0]}
+            {/* Notification Center */}
+            <NotificationCenter
+              onNavigate={(p) => {
+                if (onNavigate) onNavigate(p);
+                else router.push(`/${p === "home" ? "" : p}`);
+              }}
+              isDark={isDark}
+            />
+
+            {/* Favorites / Wishlist */}
+            <Link
+              href="/favorites"
+              aria-label="Favorites"
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all relative"
+            >
+              <Heart size={16} />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+                  {wishlistCount}
                 </span>
-                <ChevronDown
-                  size={13}
-                  className={`text-muted-foreground transition-transform ${
-                    profileOpen ? "rotate-180 text-primary" : ""
-                  }`}
-                />
+              )}
+            </Link>
+
+            {/* Theme Toggle Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setGuestThemeOpen(!guestThemeOpen)}
+                aria-label="Toggle theme"
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all"
+              >
+                {theme === "dark" ? (
+                  <Moon size={16} />
+                ) : theme === "light" ? (
+                  <Sun size={16} />
+                ) : (
+                  <Laptop size={16} />
+                )}
               </button>
 
               <AnimatePresence>
-                {profileOpen && (
+                {guestThemeOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-56 bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl overflow-hidden z-50 p-1"
+                    initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                    className="absolute right-0 mt-2 w-32 p-1 rounded-2xl bg-card border border-border shadow-xl z-50 text-xs font-medium"
                   >
-                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-                      {authUser.avatar ? (
-                        <img
-                          src={authUser.avatar}
-                          alt={authUser.name}
-                          className="w-10 h-10 rounded-2xl object-cover border border-primary/30 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center font-display font-bold text-primary-foreground text-sm shrink-0">
-                          {initials}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-foreground truncate">
-                          {authUser.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate font-mono">
-                          {authUser.email}
-                        </p>
-                        {isAdmin && (
-                          <span className="inline-block mt-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                            Admin
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="py-1">
+                    {[
+                      { mode: "light", label: "Light", icon: Sun },
+                      { mode: "dark", label: "Dark", icon: Moon },
+                      { mode: "system", label: "System", icon: Laptop },
+                    ].map(({ mode, label, icon: Icon }) => (
                       <button
+                        key={mode}
                         onClick={() => {
-                          onNavigate("profile");
-                          setProfileOpen(false);
+                          setTheme(mode);
+                          if (onThemeChange) onThemeChange(mode as ThemeMode);
+                          setGuestThemeOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors cursor-pointer"
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors ${
+                          theme === mode
+                            ? "bg-primary text-primary-foreground font-bold"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
                       >
-                        <User size={15} />
-                        Profile
+                        <Icon size={14} />
+                        <span>{label}</span>
                       </button>
-
-                      <button
-                        onClick={() => {
-                          onNavigate("profile");
-                          setProfileOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors cursor-pointer"
-                      >
-                        <Package size={15} />
-                        My Library
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          onNavigate("favorites");
-                          setProfileOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors cursor-pointer"
-                      >
-                        <Heart size={15} />
-                        Saved Resources
-                      </button>
-
-                      {isAdmin && (
-                        <button
-                          onClick={() => {
-                            onNavigate("admin");
-                            setProfileOpen(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-primary font-semibold hover:bg-primary/10 rounded-xl transition-colors cursor-pointer"
-                        >
-                          <Settings size={15} />
-                          Admin Dashboard
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Theme Mode Segmented Selector */}
-                    <div className="px-3 py-2.5 border-t border-border bg-muted/20">
-                      <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                        <span>Appearance</span>
-                        <span className="text-[10px] text-primary font-bold capitalize">
-                          {themeMode}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 bg-background/80 p-1 rounded-xl border border-border">
-                        <button
-                          type="button"
-                          onClick={() => onThemeChange?.("light")}
-                          className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                            themeMode === "light"
-                              ? "bg-card text-foreground font-bold shadow-sm border border-border"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                          title="Light Mode"
-                        >
-                          <Sun size={12} />
-                          <span className="text-[11px]">Light</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => onThemeChange?.("dark")}
-                          className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                            themeMode === "dark"
-                              ? "bg-card text-foreground font-bold shadow-sm border border-border"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                          title="Dark Mode"
-                        >
-                          <Moon size={12} />
-                          <span className="text-[11px]">Dark</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => onThemeChange?.("system")}
-                          className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                            themeMode === "system"
-                              ? "bg-card text-foreground font-bold shadow-sm border border-border"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                          title="Match Operating System Theme"
-                        >
-                          <Laptop size={12} />
-                          <span className="text-[11px]">Auto</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-border pt-1">
-                      <button
-                        onClick={() => {
-                          onLogout();
-                          setProfileOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors cursor-pointer"
-                      >
-                        <LogOut size={15} />
-                        Sign Out
-                      </button>
-                    </div>
+                    ))}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-          ) : (
-            <div className="hidden md:flex items-center gap-2">
-              {/* Guest Theme Dropdown */}
-              <div className="relative">
+
+            {/* User Profile / Auth Action Buttons */}
+            {authUser ? (
+              <div className="relative" ref={profileRef}>
                 <button
-                  onClick={() => setGuestThemeOpen(!guestThemeOpen)}
-                  aria-label="Theme mode"
-                  className="w-9 h-9 rounded-full flex items-center justify-center border border-border bg-card hover:border-primary/50 hover:bg-primary/10 transition-all duration-200 cursor-pointer"
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 p-1 pr-2 rounded-full border border-border bg-card hover:border-primary/50 transition-all cursor-pointer"
                 >
-                  {isDark ? (
-                    <Sun size={15} className="text-primary" />
+                  {authUser.avatar ? (
+                    <img
+                      src={authUser.avatar}
+                      alt={authUser.displayName || authUser.userName}
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
                   ) : (
-                    <Moon size={15} className="text-foreground" />
+                    <div className="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+                      {initials || <UserIcon size={14} />}
+                    </div>
                   )}
+                  <span className="hidden sm:inline text-xs font-bold text-foreground max-w-[90px] truncate">
+                    {authUser.displayName || authUser.userName}
+                  </span>
+                  <ChevronDown size={12} className="text-muted-foreground" />
                 </button>
 
+                {/* Profile Dropdown Menu */}
                 <AnimatePresence>
-                  {guestThemeOpen && (
+                  {profileOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                      className="absolute right-0 top-full mt-2 w-36 bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-xl p-1.5 z-50 space-y-1"
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      className="absolute right-0 mt-2 w-56 p-2 rounded-2xl bg-card border border-border shadow-2xl z-50 text-xs"
                     >
-                      <button
-                        onClick={() => {
-                          onThemeChange?.("light");
-                          setGuestThemeOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          themeMode === "light"
-                            ? "bg-primary/10 text-primary font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
+                      <div className="p-2 border-b border-border mb-1">
+                        <p className="font-bold text-foreground truncate">
+                          {authUser.displayName || authUser.userName}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {authUser.email}
+                        </p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                          {authUser.role.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <Link
+                        href="/profile"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       >
-                        <Sun size={13} /> Light
-                      </button>
-                      <button
-                        onClick={() => {
-                          onThemeChange?.("dark");
-                          setGuestThemeOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          themeMode === "dark"
-                            ? "bg-primary/10 text-primary font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
+                        <UserIcon size={14} />
+                        <span>My Profile</span>
+                      </Link>
+
+                      <Link
+                        href="/favorites"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       >
-                        <Moon size={13} /> Dark
-                      </button>
-                      <button
-                        onClick={() => {
-                          onThemeChange?.("system");
-                          setGuestThemeOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          themeMode === "system"
-                            ? "bg-primary/10 text-primary font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Laptop size={13} /> System Auto
-                      </button>
+                        <Heart size={14} />
+                        <span>Saved Kits</span>
+                      </Link>
+
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl text-primary font-bold hover:bg-primary/10 transition-colors"
+                        >
+                          <ShieldCheck size={14} />
+                          <span>Admin Studio</span>
+                        </Link>
+                      )}
+
+                      <div className="pt-1 mt-1 border-t border-border">
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            if (onLogout) onLogout();
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                        >
+                          <LogOut size={14} />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
-
-              <button
-                onClick={() => onAuthOpen("login")}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-full border border-border hover:border-primary/30 hover:bg-primary/5 cursor-pointer font-medium"
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => onAuthOpen("register")}
-                className="text-sm font-bold px-4 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
-              >
-                Get Started
-              </button>
-            </div>
-          )}
-
-          {/* Mobile menu toggle */}
-          <button
-            className="lg:hidden w-9 h-9 flex items-center justify-center cursor-pointer"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Figma-Style Category Mega Menu (Centered across viewport with safe screen padding) */}
-        <AnimatePresence>
-          {activeMegaMenuId && (
-            <div
-              className="hidden lg:flex absolute top-full left-0 right-0 w-full justify-center px-4 sm:px-6 lg:px-8 z-50 pointer-events-auto"
-              onMouseEnter={() => handleMouseEnterCategory(activeMegaMenuId)}
-              onMouseLeave={handleMouseLeaveCategory}
-            >
-              {(() => {
-                const activeCat = categories.find((c) => c.id === activeMegaMenuId);
-                if (!activeCat) return null;
-                return (
-                  <CategoryMegaMenu
-                    category={activeCat}
-                    isOpen={true}
-                    onClose={() => setActiveMegaMenuId(null)}
-                    onMouseEnter={() => handleMouseEnterCategory(activeCat.id)}
-                    onMouseLeave={handleMouseLeaveCategory}
-                    onSelectCategory={(categoryId, subcatId) => {
-                      onCategoryClick(categoryId, subcatId);
-                      setActiveMegaMenuId(null);
-                    }}
-                  />
-                );
-              })()}
-            </div>
-          )}
-        </AnimatePresence>
-      </nav>
-
-      {/* Mobile menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="lg:hidden bg-background/95 backdrop-blur-xl border-b border-border px-5 pb-6"
-          >
-            {/* Mobile search */}
-            <div className="py-4 border-b border-border/50">
-              <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-border bg-card">
-                <Search size={16} className="text-muted-foreground shrink-0" />
-                <input
-                  value={searchVal}
-                  onChange={(e) => setSearchVal(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  placeholder="Search resources..."
-                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Home + Categories */}
-            <button
-              onClick={() => {
-                onNavigate("home");
-                setMenuOpen(false);
-              }}
-              className="flex items-center gap-3 w-full text-left py-3 text-base font-medium text-foreground border-b border-border/30 transition-colors"
-            >
-              <Layout size={16} className="text-primary" />
-              Home
-            </button>
-            {categories.map((cat) => {
-              const isExpanded = mobileExpandedCats.includes(cat.id);
-              const Icon = cat.icon || Layers;
-              const hasSubcategories = cat.subcategories && cat.subcategories.length > 0;
-
-              return (
-                <div key={cat.id} className="border-b border-border/20">
-                  <div className="flex items-center justify-between w-full">
-                    <button
-                      onClick={() => {
-                        onCategoryClick(cat.id, null);
-                        setMenuOpen(false);
-                      }}
-                      className="flex items-center gap-3 py-3 text-sm font-medium text-foreground hover:text-primary transition-colors flex-1 text-left"
-                    >
-                      <Icon size={16} style={{ color: cat.color }} />
-                      <span>{cat.name}</span>
-                    </button>
-                    {hasSubcategories && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMobileExpandedCats((prev) =>
-                            prev.includes(cat.id)
-                              ? prev.filter((id) => id !== cat.id)
-                              : [...prev, cat.id]
-                          );
-                        }}
-                        className="p-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        aria-label={`Toggle ${cat.name} subcategories`}
-                      >
-                        <ChevronDown
-                          size={15}
-                          className={`transition-transform duration-200 ${
-                            isExpanded ? "rotate-180 text-primary" : ""
-                          }`}
-                        />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Subcategories Accordion */}
-                  <AnimatePresence>
-                    {isExpanded && hasSubcategories && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden pl-7 pr-2 pb-3 space-y-1"
-                      >
-                        {cat.subcategories.map((subcat) => (
-                          <button
-                            key={subcat.id}
-                            onClick={() => {
-                              onCategoryClick(cat.id, subcat.id);
-                              setMenuOpen(false);
-                            }}
-                            className="w-full text-left py-2 px-2.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-between group"
-                          >
-                            <span>{subcat.name}</span>
-                            <ArrowRight
-                              size={12}
-                              className="opacity-0 group-hover:opacity-100 text-primary transition-opacity"
-                            />
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => {
-                            onCategoryClick(cat.id, null);
-                            setMenuOpen(false);
-                          }}
-                          className="w-full text-left py-2 px-2.5 rounded-lg text-xs font-mono font-bold text-primary hover:underline flex items-center gap-1"
-                        >
-                          <span>View all {cat.name}</span>
-                          <ArrowRight size={11} />
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-
-            {/* Quick Page Links for Mobile */}
-            <div className="py-2 border-b border-border/30 space-y-1">
-              <button
-                onClick={() => {
-                  onNavigate("publisher");
-                  setMenuOpen(false);
-                }}
-                className="flex items-center justify-between w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span>Become a Publisher</span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                  Creators
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  onNavigate("about");
-                  setMenuOpen(false);
-                }}
-                className="flex items-center justify-between w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span>About Layerat</span>
-              </button>
-              <button
-                onClick={() => {
-                  onNavigate("team");
-                  setMenuOpen(false);
-                }}
-                className="flex items-center justify-between w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span>Our Team</span>
-              </button>
-            </div>
-
-            {/* Mobile Theme Selector */}
-            <div className="py-3 border-b border-border/30">
-              <div className="text-xs font-mono text-muted-foreground mb-2 flex items-center justify-between">
-                <span>Theme Mode</span>
-                <span className="text-[11px] text-primary font-bold capitalize">
-                  {themeMode}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 bg-card p-1.5 rounded-xl border border-border">
-                <button
-                  type="button"
-                  onClick={() => onThemeChange?.("light")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    themeMode === "light"
-                      ? "bg-primary text-primary-foreground font-bold shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Sun size={13} /> Light
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onThemeChange?.("dark")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    themeMode === "dark"
-                      ? "bg-primary text-primary-foreground font-bold shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Moon size={13} /> Dark
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onThemeChange?.("system")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    themeMode === "system"
-                      ? "bg-primary text-primary-foreground font-bold shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Laptop size={13} /> Auto
-                </button>
-              </div>
-            </div>
-
-            {/* Auth buttons */}
-            {authUser ? (
-              <div className="mt-4 space-y-2">
-                <button
-                  onClick={() => {
-                    onNavigate("favorites");
-                    setMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:border-primary/40 transition-colors"
-                >
-                  <Heart size={15} />
-                  My Saved Resources
-                  {wishlistCount > 0 && (
-                    <span className="ml-auto text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                      {wishlistCount}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    onNavigate("profile");
-                    setMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-border text-foreground text-sm font-medium hover:border-primary/40 transition-colors"
-                >
-                  <User size={15} /> My Profile & Library
-                </button>
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      onNavigate("admin");
-                      setMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-primary/30 bg-primary/10 text-primary text-sm font-bold"
-                  >
-                    <Settings size={15} />
-                    Admin Dashboard
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    onLogout();
-                    setMenuOpen(false);
-                  }}
-                  className="w-full py-3 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors font-medium"
-                >
-                  Sign Out
-                </button>
-              </div>
             ) : (
-              <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    onAuthOpen("register");
-                    setMenuOpen(false);
-                  }}
-                  className="w-full py-3 rounded-full bg-primary text-primary-foreground font-bold hover:opacity-95 transition-opacity text-sm shadow-md shadow-primary/20 cursor-pointer"
-                >
-                  Get Started — Free
-                </button>
-                <button
-                  onClick={() => {
-                    onAuthOpen("login");
-                    setMenuOpen(false);
-                  }}
-                  className="w-full py-3 rounded-full border border-border text-foreground font-medium text-sm hover:border-primary/40 transition-colors cursor-pointer"
+                  onClick={() => onAuthOpen?.("login")}
+                  className="px-3.5 py-1.5 text-xs font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
                 >
                   Sign In
                 </button>
+                <button
+                  onClick={() => onAuthOpen?.("register")}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-all shadow-sm cursor-pointer"
+                >
+                  <span>Join Free</span>
+                  <ArrowRight size={12} />
+                </button>
               </div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            {/* Mobile Hamburger Menu Toggle */}
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Open mobile menu"
+              className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card text-foreground"
+            >
+              {menuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Search Expandable Bar */}
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="md:hidden px-4 pb-3 pt-1 border-t border-border/40 bg-card"
+            >
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search 100+ free Figma kits..."
+                  value={searchVal}
+                  onChange={(e) => setSearchVal(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  className="w-full h-10 pl-10 pr-10 text-xs bg-muted/60 border border-border rounded-full outline-none focus:border-primary text-foreground"
+                  autoFocus
+                />
+                <Search
+                  size={15}
+                  className="absolute left-3.5 top-3 text-muted-foreground"
+                />
+                <button
+                  onClick={handleSearch}
+                  className="absolute right-2.5 top-2 px-2.5 py-1 bg-primary text-primary-foreground rounded-full text-[10px] font-bold"
+                >
+                  Search
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile Slide-down Sidebar */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="lg:hidden border-t border-border bg-card/98 backdrop-blur-2xl px-6 py-6 space-y-4 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="space-y-1">
+                <Link
+                  href="/"
+                  onClick={() => setMenuOpen(false)}
+                  className="block px-4 py-2.5 rounded-2xl text-sm font-bold text-foreground hover:bg-muted"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/browse"
+                  onClick={() => setMenuOpen(false)}
+                  className="block px-4 py-2.5 rounded-2xl text-sm font-bold text-foreground hover:bg-muted"
+                >
+                  Browse All Kits
+                </Link>
+              </div>
+
+              {/* Categories Accordion */}
+              <div className="pt-2 border-t border-border">
+                <p className="px-4 text-[11px] font-mono font-bold uppercase text-muted-foreground mb-2">
+                  Categories
+                </p>
+                <div className="space-y-1">
+                  {categories.map((cat) => {
+                    const catId = cat._id || cat.id || cat.slug;
+                    return (
+                      <Link
+                        key={catId}
+                        href={`/browse?category=${encodeURIComponent(cat.slug || catId)}`}
+                        onClick={() => {
+                          if (onCategoryClick) onCategoryClick(catId, null);
+                          setMenuOpen(false);
+                        }}
+                        className="flex items-center justify-between px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+                      >
+                        <span>{cat.name}</span>
+                        <ArrowRight size={12} className="opacity-40" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mobile Auth Button */}
+              {!authUser && (
+                <div className="pt-4 border-t border-border flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onAuthOpen?.("login");
+                    }}
+                    className="w-full py-2.5 rounded-full border border-border font-bold text-xs text-foreground text-center"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onAuthOpen?.("register");
+                    }}
+                    className="w-full py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-xs text-center"
+                  >
+                    Join Free Community
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
     </header>
   );
 }
+
+export default Navbar;

@@ -23,12 +23,14 @@ export function ProductCard({
 }) {
   const [hovered, setHovered] = useState(false);
 
+  const productId = product.id || product._id || "";
+
   const isInWishlist =
     isWishlisted !== undefined
       ? isWishlisted
       : wishlist !== undefined
-      ? wishlist.includes(product.id)
-      : Boolean(authUser?.wishlist?.includes(product.id));
+      ? wishlist.includes(productId)
+      : Boolean(authUser?.wishlist?.includes(productId));
 
   const handleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -36,10 +38,10 @@ export function ProductCard({
       onAuthOpen("login");
       return;
     }
-    onWishlistToggle(product.id);
+    onWishlistToggle(productId);
   };
 
-  const category = categories.find((c) => c.id === product.categoryId);
+  const category = categories.find((c) => (c.id || c._id) === product.categoryId);
 
   return (
     <div
@@ -128,11 +130,11 @@ export function ProductCard({
         {/* Specs footer */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/60">
           <div className="flex items-center gap-1.5">
-            {product.rating > 0 && (
+            {(product.rating ?? 0) > 0 && (
               <>
                 <Star size={12} className="text-primary fill-primary" />
                 <span className="font-semibold text-foreground">
-                  {product.rating.toFixed(1)}
+                  {(product.rating ?? 0).toFixed(1)}
                 </span>
                 <span className="text-muted-foreground/50">·</span>
               </>
@@ -153,14 +155,17 @@ export function ProductCard({
         {/* Tags */}
         {product.tags && product.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border/40">
-            {product.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground font-mono"
-              >
-                #{tag}
-              </span>
-            ))}
+            {product.tags.slice(0, 3).map((tag, i) => {
+              const tagName = typeof tag === "string" ? tag : tag.name || tag.slug || (tag as any)._id || "";
+              return (
+                <span
+                  key={tagName || i}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground font-mono"
+                >
+                  #{tagName}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>

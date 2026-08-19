@@ -1,13 +1,15 @@
-import { useEffect, useLayoutEffect } from "react";
-import { useLocation } from "react-router-dom";
+"use client";
+
+import React, { Suspense, useEffect, useLayoutEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 /**
- * Bulletproof ScrollToTop Component
- * Disables browser auto-restoration and ensures scroll is reset to (0, 0)
- * immediately, on animation frames, and after transition/suspense DOM mounts.
+ * ScrollToTop Component for Next.js App Router
+ * Resets scroll to (0, 0) upon page route or search parameter changes.
  */
-export function ScrollToTop() {
-  const { pathname, search } = useLocation();
+function ScrollToTopInner() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Set browser scrollRestoration to manual on mount
   useEffect(() => {
@@ -31,35 +33,31 @@ export function ScrollToTop() {
         document.scrollingElement.scrollTop = 0;
         document.scrollingElement.scrollLeft = 0;
       }
-      const root = document.getElementById("root");
-      if (root) {
-        root.scrollTop = 0;
-        root.scrollLeft = 0;
-      }
     } catch {}
   };
 
   useLayoutEffect(() => {
-    // 1. Synchronous execution before paint
     executeScrollReset();
-
-    // 2. Next animation frame
     const rafId = requestAnimationFrame(executeScrollReset);
-
-    // 3. Multi-stage timeouts to guarantee top position after Suspense and Framer Motion transitions
     const t1 = setTimeout(executeScrollReset, 50);
     const t2 = setTimeout(executeScrollReset, 150);
-    const t3 = setTimeout(executeScrollReset, 250);
-    const t4 = setTimeout(executeScrollReset, 400);
 
     return () => {
       cancelAnimationFrame(rafId);
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
     };
-  }, [pathname, search]);
+  }, [pathname, searchParams]);
 
   return null;
 }
+
+export function ScrollToTop() {
+  return (
+    <Suspense fallback={null}>
+      <ScrollToTopInner />
+    </Suspense>
+  );
+}
+
+export default ScrollToTop;

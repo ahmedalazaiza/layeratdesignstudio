@@ -1,12 +1,13 @@
+"use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, CheckCircle2, RefreshCw, Sparkles, ShieldAlert, Check } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { Mail, RefreshCw, Sparkles, Check } from "lucide-react";
 import { toast } from "sonner";
-import type { AuthUser } from "../../types";
+import type { User } from "@/types/api";
 
 interface UnverifiedEmailBannerProps {
-  authUser: AuthUser | null;
+  authUser: User | any | null;
   onVerificationSuccess?: () => void;
 }
 
@@ -22,7 +23,7 @@ export function UnverifiedEmailBanner({
     authUser?.isVerified || authUser?.isEmailVerified
   );
 
-  // Auto-check on window focus (when user returns from clicking email link)
+  // Auto-check on window focus
   useEffect(() => {
     if (!authUser || isUserVerified) return;
 
@@ -31,42 +32,23 @@ export function UnverifiedEmailBanner({
     const checkVerification = async () => {
       if (!isSubscribed || notifiedRef.current) return;
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!isSubscribed) return;
-
-        if (user && (user.email_confirmed_at || user.confirmed_at)) {
-          if (!notifiedRef.current) {
-            notifiedRef.current = true;
-            toast.success(
-              "🎉 Email successfully verified! All free downloads unlocked."
-            );
-            if (onVerificationSuccess) {
-              onVerificationSuccess();
-            }
-          }
+        // Optional verification check hook
+        if (onVerificationSuccess) {
+          onVerificationSuccess();
         }
       } catch (err) {
         console.error("Verification auto-check error:", err);
       }
     };
 
-    // Check on window focus
     window.addEventListener("focus", checkVerification);
-
-    // Periodic check every 15 seconds (only when user is unverified)
-    const interval = setInterval(checkVerification, 15000);
-
     return () => {
       isSubscribed = false;
       window.removeEventListener("focus", checkVerification);
-      clearInterval(interval);
     };
-  }, [authUser?.id, isUserVerified, onVerificationSuccess]);
+  }, [authUser?._id || authUser?.id, isUserVerified, onVerificationSuccess]);
 
-  // If no user or already verified, don't show banner at all
+  // If no user or already verified, don't show banner
   if (!authUser || isUserVerified) {
     return null;
   }
@@ -74,26 +56,16 @@ export function UnverifiedEmailBanner({
   const handleManualCheck = async () => {
     try {
       setChecking(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user && (user.email_confirmed_at || user.confirmed_at)) {
-        if (!notifiedRef.current) {
-          notifiedRef.current = true;
-          toast.success("🎉 Email successfully verified! Downloads unlocked.");
-        }
-        if (onVerificationSuccess) {
-          onVerificationSuccess();
-        }
-      } else {
-        toast.info(
-          "Account still pending verification. Please click the link in your email.",
-          {
-            description: `Check spam folder or click 'Resend Link' if you haven't received it at ${authUser.email}.`,
-          }
-        );
+      if (onVerificationSuccess) {
+        onVerificationSuccess();
       }
-    } catch (err: any) {
+      toast.info(
+        "Account pending verification. Please check the link sent to your email.",
+        {
+          description: `Check spam folder or click 'Resend Link' if you haven't received it at ${authUser.email}.`,
+        }
+      );
+    } catch {
       toast.error("Failed to check status. Please try again.");
     } finally {
       setChecking(false);
@@ -104,30 +76,11 @@ export function UnverifiedEmailBanner({
     if (!authUser.email) return;
     try {
       setResending(true);
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: authUser.email,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
-      });
-
-      if (error) {
-        if (error.message.toLowerCase().includes("rate limit")) {
-          toast.error(
-            "Too many requests. Please wait a minute before requesting another email."
-          );
-        } else {
-          throw error;
-        }
-      } else {
-        toast.success(
-          `Verification link sent to ${authUser.email}! Please check your inbox.`
-        );
-      }
+      toast.success(
+        `Verification link requested for ${authUser.email}! Please check your inbox.`
+      );
     } catch (err: any) {
-      console.error("Resend error:", err);
-      toast.error(err.message || "Failed to resend verification link.");
+      toast.error(err?.message || "Failed to resend verification link.");
     } finally {
       setResending(false);
     }
@@ -189,3 +142,5 @@ export function UnverifiedEmailBanner({
     </AnimatePresence>
   );
 }
+
+export default UnverifiedEmailBanner;

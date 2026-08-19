@@ -1,0 +1,12 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/browse/page": "app/browse/page.js",
+  "/about/page": "app/about/page.js",
+  "/publisher/page": "app/publisher/page.js",
+  "/privacy/page": "app/privacy/page.js",
+  "/page": "app/page.js",
+  "/favorites/page": "app/favorites/page.js",
+  "/team/page": "app/team/page.js",
+  "/product/[slug]/page": "app/product/[slug]/page.js",
+  "/terms/page": "app/terms/page.js"
+}
