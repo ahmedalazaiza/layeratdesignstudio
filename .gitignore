@@ -57,3 +57,7 @@ Thumbs.db
 *.tsbuildinfo
 .vite/
 .cache/
+
+# next.js
+/.next/
+/out/
